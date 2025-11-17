@@ -7,6 +7,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { logout as logoutApi } from '../api/auth';
 import TenantSelector from '../components/TenantSelector';
 import ThemeToggle from '../components/ThemeToggle';
+import PageSwitcher from '../components/PageSwitcher';
 import { protectedRoutes } from '../config/routes';
 
 export default function AppLayout({ children }) {
@@ -142,6 +143,8 @@ export default function AppLayout({ children }) {
         }}
       >
         {children}
+        {/* Floating page switcher - only show if there are pages configured */}
+        {Array.isArray(pagesConfig) && pagesConfig.length > 0 && <PageSwitcher />}
       </div>
     </ProLayout>
   );
