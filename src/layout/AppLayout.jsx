@@ -1,6 +1,6 @@
 import { ProLayout } from '@ant-design/pro-layout';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { UserOutlined, LogoutOutlined, HomeOutlined, SettingOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, HomeOutlined, SettingOutlined, FileTextOutlined } from '@ant-design/icons';
 import { Dropdown, Space, Button, theme } from 'antd';
 import { useAuth } from '../contexts/AuthContext';
 import TenantSelector from '../components/TenantSelector';
@@ -48,12 +48,12 @@ export default function AppLayout({ children }) {
             <HomeOutlined />
           ),
       })),
-    // Add pages from config as menu items
+    // Add pages from config as menu items (only if there are pages configured)
     ...(Array.isArray(pagesConfig) && pagesConfig.length > 0
       ? pagesConfig.map((page) => ({
           path: `/pages/${page.page_key}`,
           name: page.title || page.page_key,
-          icon: <UserOutlined />,
+          icon: <FileTextOutlined />,
         }))
       : []),
   ];
