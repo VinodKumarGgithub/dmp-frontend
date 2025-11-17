@@ -10,11 +10,15 @@ const { Text } = Typography;
 export default function TenantSelector() {
   const selectedTenant = useAuthStore((state) => state.selectedTenant);
   const setSelectedTenant = useAuthStore((state) => state.setSelectedTenant);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
   const queryClient = useQueryClient();
   const { token } = antdTheme.useToken();
 
-  // Fetch only ACTIVE tenants for selection
-  const { data: tenantsData, isLoading } = useTenants({ status: 'ACTIVE' });
+  // Fetch only ACTIVE tenants for selection - only when authenticated
+  const { data: tenantsData, isLoading } = useTenants(
+    { status: 'ACTIVE' },
+    { enabled: isAuthenticated }
+  );
   const tenants = tenantsData?.data || (Array.isArray(tenantsData) ? tenantsData : []);
 
   const handleTenantChange = (tenantId) => {

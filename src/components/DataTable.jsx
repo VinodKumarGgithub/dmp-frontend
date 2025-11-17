@@ -67,6 +67,36 @@ export default function DataTable({
     return columns;
   }, [config, token, onMoreClick]);
 
+  // Generate unique row key from record data - MUST be before any early returns
+  const getRowKey = useMemo(() => {
+    return (record) => {
+      // Try to find a unique identifier in the record
+      if (record.id) return String(record.id);
+      
+      // Try first column value
+      const firstColumn = config?.columns?.[0]?.name;
+      if (firstColumn && record[firstColumn] !== undefined && record[firstColumn] !== null) {
+        return String(record[firstColumn]);
+      }
+      
+      // Generate key from multiple column values as fallback
+      if (config?.columns) {
+        const keyParts = config.columns
+          .slice(0, 3)
+          .map(col => record[col.name])
+          .filter(val => val !== undefined && val !== null)
+          .map(val => String(val));
+        
+        if (keyParts.length > 0) {
+          return keyParts.join('_');
+        }
+      }
+      
+      // Last resort: use a hash of the record
+      return JSON.stringify(record);
+    };
+  }, [config]);
+
   // Show skeleton loader when loading
   if (loading) {
     return (
@@ -100,34 +130,6 @@ export default function DataTable({
       </Card>
     );
   }
-
-  // Generate unique row key from record data
-  const getRowKey = useMemo(() => {
-    return (record) => {
-      // Try to find a unique identifier in the record
-      if (record.id) return String(record.id);
-      
-      // Try first column value
-      const firstColumn = config.columns[0]?.name;
-      if (firstColumn && record[firstColumn] !== undefined && record[firstColumn] !== null) {
-        return String(record[firstColumn]);
-      }
-      
-      // Generate key from multiple column values as fallback
-      const keyParts = config.columns
-        .slice(0, 3)
-        .map(col => record[col.name])
-        .filter(val => val !== undefined && val !== null)
-        .map(val => String(val));
-      
-      if (keyParts.length > 0) {
-        return keyParts.join('_');
-      }
-      
-      // Last resort: use a hash of the record
-      return JSON.stringify(record);
-    };
-  }, [config]);
 
   // Show table with data
   return (
