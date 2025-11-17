@@ -29,10 +29,24 @@ export default function AppLayout({ children }) {
     // Static routes from protectedRoutes (excluding home)
     ...protectedRoutes
       .filter((route) => route.label && route.key !== 'home')
+      .filter((route) => {
+        // Only show admin routes to admin users
+        if (route.adminOnly && user?.role !== 'ADMIN') {
+          return false;
+        }
+        return true;
+      })
       .map((route) => ({
         path: route.path,
         name: route.label,
-        icon: route.key === 'page-config' ? <SettingOutlined /> : <HomeOutlined />,
+        icon:
+          route.key === 'page-config' ? (
+            <SettingOutlined />
+          ) : route.key === 'users' ? (
+            <UserOutlined />
+          ) : (
+            <HomeOutlined />
+          ),
       })),
     // Add pages from config as menu items
     ...(Array.isArray(pagesConfig) && pagesConfig.length > 0
@@ -73,8 +87,8 @@ export default function AppLayout({ children }) {
 
   return (
     <ProLayout
-      title="Clinical Frontend"
-      logo={<div style={{ color: token.colorText, fontWeight: token.fontWeightStrong }}>CF</div>}
+      title="Clinical Manager"
+      logo={<div style={{ color: token.colorText, fontWeight: token.fontWeightStrong }}>CM</div>}
       location={{
         pathname: location.pathname,
       }}

@@ -14,24 +14,31 @@ import {
   Popconfirm,
   message,
   theme as antdTheme,
+  Select,
+  Checkbox,
+  Divider,
+  Row,
+  Col,
+  Tabs,
+  Tooltip,
 } from 'antd';
 import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
   SettingOutlined,
+  DeleteFilled,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { usePages } from '../api/pages';
 import { useCreatePageConfig, useUpdatePageConfig, useDeletePageConfig } from '../api/pageConfig';
-import { useAuth } from '../contexts/AuthContext';
 import axiosInstance from '../api/axiosInstance';
 
-const { Title } = Typography;
-const { TextArea } = Input;
+const { Title, Text } = Typography;
+const { Option } = Select;
 
 export default function PageConfigManagement() {
   const { token } = antdTheme.useToken();
-  const { user } = useAuth();
   const { data: pagesData, isLoading } = usePages();
   const createMutation = useCreatePageConfig();
   const updateMutation = useUpdatePageConfig();
@@ -40,20 +47,27 @@ export default function PageConfigManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPage, setEditingPage] = useState(null);
   const [form] = Form.useForm();
+  const [activeTab, setActiveTab] = useState('basic');
 
   const pages = pagesData?.data || (Array.isArray(pagesData) ? pagesData : []);
 
-  // Check if user is admin (you may need to adjust this based on your auth setup)
-  const isAdmin = user?.role === 'ADMIN';
-
   const handleAdd = () => {
     setEditingPage(null);
+    setActiveTab('basic');
     form.resetFields();
+    form.setFieldsValue({
+      page_size_default: 20,
+      is_download_allowed: false,
+      columns: [{ name: '', label: '', type: 'string' }],
+      searchable_fields: [],
+      filterable_fields: [],
+    });
     setIsModalOpen(true);
   };
 
   const handleEdit = async (page) => {
     setEditingPage(page);
+    setActiveTab('basic');
     try {
       // Fetch full config for editing
       const response = await axiosInstance.get(`/pages/${page.page_key}/config`);
@@ -63,10 +77,11 @@ export default function PageConfigManagement() {
         page_key: config.page_key,
         title: config.title,
         data_source: config.data_source,
-        columns_json: JSON.stringify(config.columns || [], null, 2),
-        searchable_fields_json: JSON.stringify(config.searchable_fields || [], null, 2),
-        filterable_fields_json: JSON.stringify(config.filterable_fields || [], null, 2),
-        default_sort_json: config.default_sort ? JSON.stringify(config.default_sort, null, 2) : '',
+        columns: config.columns || [],
+        searchable_fields: config.searchable_fields || [],
+        filterable_fields: config.filterable_fields || [],
+        default_sort: config.default_sort?.field || null,
+        default_sort_order: config.default_sort?.order || 'ASC',
         is_download_allowed: config.is_download_allowed,
         page_size_default: config.page_size_default,
       });
@@ -86,20 +101,41 @@ export default function PageConfigManagement() {
 
   const handleSubmit = async (values) => {
     try {
-      // Parse JSON fields
-      const submitData = {
-        ...values,
-        columns: JSON.parse(values.columns_json),
-        searchable_fields: JSON.parse(values.searchable_fields_json),
-        filterable_fields: JSON.parse(values.filterable_fields_json),
-        default_sort: values.default_sort_json ? JSON.parse(values.default_sort_json) : null,
-      };
+      // Get columns from form list
+      const columns = form.getFieldValue('columns') || [];
       
-      // Remove JSON string fields
-      delete submitData.columns_json;
-      delete submitData.searchable_fields_json;
-      delete submitData.filterable_fields_json;
-      delete submitData.default_sort_json;
+      // Filter out empty columns
+      const validColumns = columns.filter(col => col.name && col.label);
+      
+      if (validColumns.length === 0) {
+        message.error('Please add at least one column');
+        return;
+      }
+
+      // Get searchable fields (array of column names)
+      const searchable_fields = form.getFieldValue('searchable_fields') || [];
+      
+      // Get filterable fields from form list
+      const filterable_fields = form.getFieldValue('filterable_fields') || [];
+      const validFilters = filterable_fields.filter(f => f.name && f.label);
+      
+      // Build default sort
+      const default_sort = values.default_sort ? {
+        field: values.default_sort,
+        order: values.default_sort_order || 'ASC',
+      } : null;
+
+      const submitData = {
+        page_key: values.page_key,
+        title: values.title,
+        data_source: values.data_source,
+        columns: validColumns,
+        searchable_fields: searchable_fields,
+        filterable_fields: validFilters,
+        default_sort: default_sort,
+        is_download_allowed: values.is_download_allowed || false,
+        page_size_default: values.page_size_default || 20,
+      };
 
       if (editingPage) {
         await updateMutation.mutateAsync({
@@ -112,10 +148,7 @@ export default function PageConfigManagement() {
       setIsModalOpen(false);
       form.resetFields();
     } catch (error) {
-      if (error.message?.includes('JSON')) {
-        message.error('Invalid JSON format. Please check your JSON fields.');
-      }
-      // Other errors already handled by mutation
+      // Errors already handled by mutation
     }
   };
 
@@ -149,7 +182,6 @@ export default function PageConfigManagement() {
             type="link"
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
-            disabled={!isAdmin}
           >
             Edit
           </Button>
@@ -164,7 +196,6 @@ export default function PageConfigManagement() {
               type="link"
               danger
               icon={<DeleteOutlined />}
-              disabled={!isAdmin}
             >
               Delete
             </Button>
@@ -174,14 +205,392 @@ export default function PageConfigManagement() {
     },
   ];
 
-  if (!isAdmin) {
-    return (
-      <Card>
-        <Title level={4}>Access Denied</Title>
-        <p>You need admin privileges to manage page configurations.</p>
-      </Card>
-    );
-  }
+  const tabItems = [
+    {
+      key: 'basic',
+      label: 'Basic Info',
+      children: (
+        <>
+          <Form.Item
+            name="page_key"
+            label={
+              <Space>
+                <span>Page Key</span>
+                <Tooltip title="Unique identifier for this page (letters, numbers, underscore, hyphen only)">
+                  <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                </Tooltip>
+              </Space>
+            }
+            rules={[
+              { required: true, message: 'Please enter page key' },
+              { pattern: /^[a-zA-Z0-9_-]+$/, message: 'Only letters, numbers, underscore and hyphen allowed' },
+            ]}
+          >
+            <Input placeholder="e.g., age_edit" disabled={!!editingPage} />
+          </Form.Item>
+
+          <Form.Item
+            name="title"
+            label="Page Title"
+            rules={[{ required: true, message: 'Please enter title' }]}
+          >
+            <Input placeholder="e.g., Age Edit Data" />
+          </Form.Item>
+
+          <Form.Item
+            name="data_source"
+            label={
+              <Space>
+                <span>Database Table/View Name</span>
+                <Tooltip title="The name of the table or view in your database that contains the data">
+                  <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                </Tooltip>
+              </Space>
+            }
+            rules={[
+              { required: true, message: 'Please enter data source' },
+              { pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/, message: 'Invalid table/view name format' },
+            ]}
+          >
+            <Input placeholder="e.g., age_edits" />
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="page_size_default"
+                label="Default Page Size"
+                rules={[{ required: true, message: 'Please enter page size' }]}
+              >
+                <InputNumber min={1} max={100} style={{ width: '100%' }} />
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="is_download_allowed"
+                label="Allow CSV Download"
+                valuePropName="checked"
+              >
+                <Switch />
+              </Form.Item>
+            </Col>
+          </Row>
+        </>
+      ),
+    },
+    {
+      key: 'columns',
+      label: 'Columns',
+      children: (
+        <Form.List name="columns">
+          {(fields, { add, remove }) => (
+            <>
+              {fields.map(({ key, name, ...restField }) => (
+                <Card
+                  key={key}
+                  size="small"
+                  style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
+                  extra={
+                    fields.length > 1 && (
+                      <Button
+                        type="text"
+                        danger
+                        icon={<DeleteFilled />}
+                        onClick={() => remove(name)}
+                      />
+                    )
+                  }
+                >
+                  <Row gutter={16}>
+                    <Col span={8}>
+                      <Form.Item
+                        {...restField}
+                        name={[name, 'name']}
+                        label="Column Name"
+                        rules={[{ required: true, message: 'Required' }]}
+                      >
+                        <Input placeholder="e.g., id" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item
+                        {...restField}
+                        name={[name, 'label']}
+                        label="Display Label"
+                        rules={[{ required: true, message: 'Required' }]}
+                      >
+                        <Input placeholder="e.g., ID" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item
+                        {...restField}
+                        name={[name, 'type']}
+                        label="Data Type"
+                        initialValue="string"
+                      >
+                        <Select>
+                          <Option value="string">String</Option>
+                          <Option value="number">Number</Option>
+                          <Option value="date">Date</Option>
+                          <Option value="boolean">Boolean</Option>
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                  <Form.Item
+                    {...restField}
+                    name={[name, 'width']}
+                    label="Column Width (optional)"
+                  >
+                    <InputNumber min={50} max={500} style={{ width: '100%' }} placeholder="Auto" />
+                  </Form.Item>
+                </Card>
+              ))}
+              <Button
+                type="dashed"
+                onClick={() => add({ name: '', label: '', type: 'string' })}
+                block
+                icon={<PlusOutlined />}
+              >
+                Add Column
+              </Button>
+            </>
+          )}
+        </Form.List>
+      ),
+    },
+    {
+      key: 'search',
+      label: 'Search & Filters',
+      children: (
+        <>
+          <Form.Item
+            name="searchable_fields"
+            label={
+              <Space>
+                <span>Searchable Fields</span>
+                <Tooltip title="Select which columns users can search through">
+                  <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            <Form.Item name="searchable_fields" noStyle>
+              <Form.Item
+                noStyle
+                shouldUpdate={(prevValues, currentValues) =>
+                  JSON.stringify(prevValues.columns) !== JSON.stringify(currentValues.columns)
+                }
+              >
+                {({ getFieldValue }) => {
+                  const columns = getFieldValue('columns') || [];
+                  const validColumns = columns.filter(col => col && col.name);
+                  
+                  if (validColumns.length === 0) {
+                    return (
+                      <Text type="secondary">
+                        Add columns first, then select which ones should be searchable
+                      </Text>
+                    );
+                  }
+
+                  return (
+                    <Checkbox.Group style={{ width: '100%' }}>
+                      <Row>
+                        {validColumns.map((col, index) => (
+                          <Col span={8} key={`${col.name}-${index}`}>
+                            <Checkbox value={col.name}>{col.label || col.name}</Checkbox>
+                          </Col>
+                        ))}
+                      </Row>
+                    </Checkbox.Group>
+                  );
+                }}
+              </Form.Item>
+            </Form.Item>
+            <Text type="secondary" style={{ fontSize: token.fontSizeSM, display: 'block', marginTop: token.marginXS }}>
+              Select columns that users can search through
+            </Text>
+          </Form.Item>
+
+          <Divider />
+
+          <Form.Item
+            label={
+              <Space>
+                <span>Filterable Fields</span>
+                <Tooltip title="Add filters that users can apply to narrow down results">
+                  <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            <Form.List name="filterable_fields">
+              {(fields, { add, remove }) => (
+                <>
+                  {fields.map(({ key, name, ...restField }) => (
+                    <Card
+                      key={key}
+                      size="small"
+                      style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
+                      extra={
+                        <Button
+                          type="text"
+                          danger
+                          icon={<DeleteFilled />}
+                          onClick={() => remove(name)}
+                        />
+                      }
+                    >
+                      <Row gutter={16}>
+                        <Col span={8}>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'name']}
+                            label="Field Name"
+                            rules={[{ required: true, message: 'Required' }]}
+                          >
+                            <Input placeholder="e.g., status" />
+                          </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'label']}
+                            label="Filter Label"
+                            rules={[{ required: true, message: 'Required' }]}
+                          >
+                            <Input placeholder="e.g., Status" />
+                          </Form.Item>
+                        </Col>
+                        <Col span={8}>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'type']}
+                            label="Filter Type"
+                            rules={[{ required: true, message: 'Required' }]}
+                            initialValue="text"
+                          >
+                            <Select>
+                              <Option value="text">Text Input</Option>
+                              <Option value="select">Dropdown</Option>
+                              <Option value="number">Number</Option>
+                              <Option value="date">Date Range</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                      </Row>
+                      <Form.Item
+                        noStyle
+                        shouldUpdate={(prevValues, currentValues) =>
+                          prevValues.filterable_fields?.[name]?.type !== currentValues.filterable_fields?.[name]?.type
+                        }
+                      >
+                        {({ getFieldValue }) => {
+                          const filterType = getFieldValue(['filterable_fields', name, 'type']);
+                          if (filterType === 'select') {
+                            return (
+                              <Form.Item
+                                {...restField}
+                                name={[name, 'options']}
+                                label="Dropdown Options"
+                                rules={[{ required: true, message: 'Required for dropdown' }]}
+                              >
+                                <Select
+                                  mode="tags"
+                                  placeholder="Type and press Enter to add options"
+                                  style={{ width: '100%' }}
+                                />
+                              </Form.Item>
+                            );
+                          }
+                          return null;
+                        }}
+                      </Form.Item>
+                    </Card>
+                  ))}
+                  <Button
+                    type="dashed"
+                    onClick={() => add({ name: '', label: '', type: 'text' })}
+                    block
+                    icon={<PlusOutlined />}
+                  >
+                    Add Filter
+                  </Button>
+                </>
+              )}
+            </Form.List>
+          </Form.Item>
+        </>
+      ),
+    },
+    {
+      key: 'sort',
+      label: 'Default Sort',
+      children: (
+        <>
+          <Form.Item
+            name="default_sort"
+            label={
+              <Space>
+                <span>Default Sort Field</span>
+                <Tooltip title="Which column should be used for default sorting">
+                  <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                </Tooltip>
+              </Space>
+            }
+          >
+            <Form.Item
+              noStyle
+              shouldUpdate={(prevValues, currentValues) =>
+                JSON.stringify(prevValues.columns) !== JSON.stringify(currentValues.columns)
+              }
+            >
+              {({ getFieldValue }) => {
+                const columns = getFieldValue('columns') || [];
+                const validColumns = columns.filter(col => col && col.name);
+                
+                return (
+                  <Select placeholder="Select a column" allowClear>
+                    {validColumns.map((col, index) => (
+                      <Option key={`${col.name}-${index}`} value={col.name}>
+                        {col.label || col.name}
+                      </Option>
+                    ))}
+                  </Select>
+                );
+              }}
+            </Form.Item>
+          </Form.Item>
+
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) =>
+              prevValues.default_sort !== currentValues.default_sort
+            }
+          >
+            {({ getFieldValue }) => {
+              const sortField = getFieldValue('default_sort');
+              if (!sortField) return null;
+              return (
+                <Form.Item
+                  name="default_sort_order"
+                  label="Sort Order"
+                  initialValue="ASC"
+                >
+                  <Select>
+                    <Option value="ASC">Ascending (A-Z, 1-9)</Option>
+                    <Option value="DESC">Descending (Z-A, 9-1)</Option>
+                  </Select>
+                </Form.Item>
+              );
+            }}
+          </Form.Item>
+        </>
+      ),
+    },
+  ];
 
   return (
     <div style={{ padding: token.paddingLG }}>
@@ -216,8 +625,10 @@ export default function PageConfigManagement() {
           form.resetFields();
         }}
         onOk={() => form.submit()}
-        width={800}
+        width={900}
         confirmLoading={createMutation.isPending || updateMutation.isPending}
+        okText="Save"
+        cancelText="Cancel"
       >
         <Form
           form={form}
@@ -226,103 +637,19 @@ export default function PageConfigManagement() {
           initialValues={{
             page_size_default: 20,
             is_download_allowed: false,
+            columns: [{ name: '', label: '', type: 'string' }],
+            searchable_fields: [],
+            filterable_fields: [],
+            default_sort_order: 'ASC',
           }}
         >
-          <Form.Item
-            name="page_key"
-            label="Page Key"
-            rules={[
-              { required: true, message: 'Please enter page key' },
-              { pattern: /^[a-zA-Z0-9_-]+$/, message: 'Only letters, numbers, underscore and hyphen allowed' },
-            ]}
-          >
-            <Input placeholder="e.g., age_edit" disabled={!!editingPage} />
-          </Form.Item>
-
-          <Form.Item
-            name="title"
-            label="Title"
-            rules={[{ required: true, message: 'Please enter title' }]}
-          >
-            <Input placeholder="e.g., Age Edit Data" />
-          </Form.Item>
-
-          <Form.Item
-            name="data_source"
-            label="Data Source (Table/View Name)"
-            rules={[
-              { required: true, message: 'Please enter data source' },
-              { pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/, message: 'Invalid table/view name format' },
-            ]}
-          >
-            <Input placeholder="e.g., age_edits" />
-          </Form.Item>
-
-          <Form.Item
-            name="columns_json"
-            label="Columns (JSON)"
-            tooltip="Array of column objects: [{name, label, type, width?}]"
-            rules={[{ required: true, message: 'Please enter columns JSON' }]}
-          >
-            <TextArea
-              rows={6}
-              placeholder='[{"name": "id", "label": "ID", "type": "number"}, {"name": "name", "label": "Name", "type": "string"}]'
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="searchable_fields_json"
-            label="Searchable Fields (JSON)"
-            tooltip="Array of field names: [&quot;field1&quot;, &quot;field2&quot;]"
-            rules={[{ required: true, message: 'Please enter searchable fields' }]}
-          >
-            <TextArea
-              rows={3}
-              placeholder='["name", "email"]'
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="filterable_fields_json"
-            label="Filterable Fields (JSON)"
-            tooltip="Array of filter objects: [{name, label, type, options?}]"
-            rules={[{ required: true, message: 'Please enter filterable fields' }]}
-          >
-            <TextArea
-              rows={6}
-              placeholder='[{"name": "status", "label": "Status", "type": "select", "options": ["ACTIVE", "INACTIVE"]}]'
-            />
-          </Form.Item>
-
-          <Form.Item
-            name="default_sort_json"
-            label="Default Sort (JSON)"
-            tooltip='Object: {"field": "id", "order": "ASC" or "DESC"}'
-          >
-            <TextArea
-              rows={2}
-              placeholder='{"field": "id", "order": "DESC"}'
-            />
-          </Form.Item>
-
-          <Space>
-            <Form.Item
-              name="is_download_allowed"
-              valuePropName="checked"
-            >
-              <Switch /> Allow Download
-            </Form.Item>
-
-            <Form.Item
-              name="page_size_default"
-              label="Default Page Size"
-            >
-              <InputNumber min={1} max={100} />
-            </Form.Item>
-          </Space>
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={tabItems}
+          />
         </Form>
       </Modal>
     </div>
   );
 }
-

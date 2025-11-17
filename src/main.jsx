@@ -48,7 +48,7 @@ createRoot(document.getElementById('root')).render(
         <ThemeConfigWrapper>
           <AntdApp>
             <AuthProvider>
-              <App />
+      <App />
             </AuthProvider>
           </AntdApp>
         </ThemeConfigWrapper>

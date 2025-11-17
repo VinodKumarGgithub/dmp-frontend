@@ -1,8 +1,10 @@
 import HomePage from '../pages/HomePage';
 import LoginPage from '../pages/LoginPage';
 import PageConfigManagement from '../pages/PageConfigManagement';
+import UserManagement from '../pages/UserManagement';
 import DataPage from '../pages/DataPage';
 import ProtectedRoute from '../components/ProtectedRoute';
+import AdminRoute from '../components/AdminRoute';
 
 export const publicRoutes = [
   {
@@ -24,6 +26,14 @@ export const protectedRoutes = [
     element: <PageConfigManagement />,
     label: 'Page Config',
     key: 'page-config',
+    adminOnly: true,
+  },
+  {
+    path: '/users',
+    element: <UserManagement />,
+    label: 'User Management',
+    key: 'users',
+    adminOnly: true,
   },
   {
     path: '/pages/:pageKey',
@@ -33,12 +43,18 @@ export const protectedRoutes = [
   },
 ];
 
-// Wrap protected routes with ProtectedRoute component
+// Wrap protected routes with ProtectedRoute or AdminRoute component
 export const routes = [
   ...publicRoutes,
   ...protectedRoutes.map((route) => ({
     ...route,
-    element: <ProtectedRoute>{route.element}</ProtectedRoute>,
+    element: route.adminOnly ? (
+      <ProtectedRoute>
+        <AdminRoute>{route.element}</AdminRoute>
+      </ProtectedRoute>
+    ) : (
+      <ProtectedRoute>{route.element}</ProtectedRoute>
+    ),
   })),
 ];
 

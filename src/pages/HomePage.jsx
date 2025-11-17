@@ -129,7 +129,7 @@ export default function HomePage() {
   return (
     <div style={{ padding: token.paddingLG }}>
       <Card>
-        <Title level={2}>Welcome to Clinical Frontend</Title>
+        <Title level={2}>Welcome to Clinical Data Management system</Title>
         <Paragraph>
           You have <Text strong>{pagesConfig.length}</Text> page{pagesConfig.length !== 1 ? 's' : ''} configured.
         </Paragraph>

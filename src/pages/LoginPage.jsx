@@ -45,7 +45,7 @@ export default function LoginPage() {
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           <div style={{ textAlign: 'center' }}>
             <Title level={2} style={{ marginBottom: token.marginXS }}>
-              Clinical Frontend
+              Clinical Manager
             </Title>
             <Title level={5} type="secondary" style={{ marginBottom: 0 }}>
               Sign in to your account

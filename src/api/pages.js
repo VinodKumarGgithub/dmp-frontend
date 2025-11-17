@@ -89,21 +89,83 @@ export function usePage(pageKey, queryParams = {}) {
       }
     },
     enabled: !!pageKey,
+    // Keep previous data while fetching new data (prevents UI flicker)
+    placeholderData: (previousData) => previousData,
+    // Don't refetch on window focus to prevent unwanted reloads
+    refetchOnWindowFocus: false,
   });
 }
 
 /**
- * Download page data as CSV
+ * Convert JSON data to CSV format
+ */
+function convertToCSV(data) {
+  if (!Array.isArray(data) || data.length === 0) {
+    return '';
+  }
+
+  // Get columns from first row
+  const firstRow = data[0];
+  if (!firstRow || typeof firstRow !== 'object') {
+    return '';
+  }
+
+  const cols = Object.keys(firstRow);
+  if (cols.length === 0) {
+    return '';
+  }
+
+  // Generate CSV header
+  const header = cols.map((col) => {
+    const escaped = String(col).replace(/"/g, '""');
+    return `"${escaped}"`;
+  }).join(',');
+
+  // Generate CSV rows
+  const rows = data.map((row) => {
+    if (!row || typeof row !== 'object') {
+      return cols.map(() => '""').join(',');
+    }
+    return cols
+      .map((col) => {
+        const value = row[col];
+        if (value === null || value === undefined) {
+          return '""';
+        }
+        const str = String(value).replace(/"/g, '""');
+        return `"${str}"`;
+      })
+      .join(',');
+  });
+
+  return [header, ...rows].join('\n');
+}
+
+/**
+ * Download page data as CSV (streaming approach)
+ * Backend sends JSON, frontend converts to CSV and downloads
  */
 export async function downloadPageData(pageKey, queryParams = {}) {
   try {
+    // Fetch JSON data from backend
     const response = await axiosInstance.get(`/pages/${pageKey}/download`, {
       params: queryParams,
-      responseType: 'blob',
+      responseType: 'json',
     });
 
+    // Extract data from response
+    const responseData = response.data || response;
+    const data = responseData.data?.data || responseData.data || [];
+
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('No data available to download');
+    }
+
+    // Convert JSON to CSV
+    const csv = convertToCSV(data);
+
     // Create blob and download
-    const blob = new Blob([response.data], { type: 'text/csv' });
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

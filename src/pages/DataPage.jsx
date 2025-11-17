@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import {
   Card,
-  Table,
   Input,
   Button,
   Space,
@@ -13,6 +12,8 @@ import {
   theme as antdTheme,
   Row,
   Col,
+  Drawer,
+  Descriptions,
 } from 'antd';
 import {
   SearchOutlined,
@@ -24,6 +25,7 @@ import { useParams } from 'react-router-dom';
 import { usePage, downloadPageData } from '../api/pages';
 import { showSuccess, showError } from '../utils/errorHandler';
 import { useAuth } from '../contexts/AuthContext';
+import DataTable from '../components/DataTable';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -42,6 +44,9 @@ export default function DataPage() {
     pageSize: 20,
   });
   const [sorting, setSorting] = useState({});
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [downloading, setDownloading] = useState(false);
 
   // Build query params for API
   const queryParams = useMemo(() => {
@@ -70,7 +75,9 @@ export default function DataPage() {
   }, [searchText, filters, pagination, sorting]);
 
   // Fetch page config and data
-  const { data: pageData, isLoading, isError, error, refetch } = usePage(pageKey, queryParams);
+  // Use isFetching for table loading (shows loading on refetch)
+  // Use isLoading only for initial config load check
+  const { data: pageData, isLoading, isFetching, isError, error, refetch } = usePage(pageKey, queryParams);
 
   // Handle response format from axios interceptor:
   // Backend returns: { success: true, message: "...", data: { config, data, total } }
@@ -121,23 +128,20 @@ export default function DataPage() {
       return;
     }
 
-    // Check if there's data to download
-    if (!Array.isArray(tableData) || tableData.length === 0) {
-      showError('No data available to download');
-      return;
-    }
-
     // Check if there's an error state
     if (isError) {
       showError('Cannot download data due to an error. Please resolve the error and try again.');
       return;
     }
 
+    setDownloading(true);
     try {
       await downloadPageData(pageKey, queryParams);
-      showSuccess('Download started successfully');
+      showSuccess('Download completed successfully');
     } catch (error) {
       // Error already handled by downloadPageData
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -149,26 +153,12 @@ export default function DataPage() {
     form.resetFields();
   };
 
-  // Build table columns from config
-  const tableColumns = useMemo(() => {
-    if (!config?.columns) return [];
+  const handleMoreClick = (record) => {
+    setSelectedRecord(record);
+    setDrawerVisible(true);
+  };
 
-    return config.columns.map((col) => ({
-      title: col.label || col.name,
-      dataIndex: col.name,
-      key: col.name,
-      width: col.width,
-      sorter: true,
-      render: (value) => {
-        if (value === null || value === undefined) return '-';
-        if (col.type === 'date' && value) {
-          return new Date(value).toLocaleDateString();
-        }
-        return String(value);
-      },
-    }));
-  }, [config]);
-
+  // Only show full page loading on initial config load
   if (isLoading && !config) {
     return (
       <div
@@ -238,10 +228,10 @@ export default function DataPage() {
                 type="primary"
                 icon={<DownloadOutlined />}
                 onClick={handleDownload}
-                disabled={isError || !Array.isArray(tableData) || tableData.length === 0}
-                loading={false}
+                disabled={isError || downloading}
+                loading={downloading}
               >
-                Download CSV
+                {downloading ? 'Downloading...' : 'Download CSV'}
               </Button>
             )}
             <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
@@ -273,7 +263,7 @@ export default function DataPage() {
             style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
           >
             <Form form={form} layout="inline">
-              <Row gutter={[16, 16]} style={{ width: '100%' }}>
+              <Row gutter={[16, 16]} align="bottom" style={{ width: '100%' }}>
                 {config.filterable_fields.map((field) => (
                   <Col key={field.name} xs={24} sm={12} md={8} lg={6}>
                     <Form.Item label={field.label} style={{ marginBottom: 0 }}>
@@ -322,35 +312,71 @@ export default function DataPage() {
           </Card>
         )}
 
-        {/* Data Table */}
-        {tableData.length === 0 && !isLoading ? (
-          <Card style={{ textAlign: 'center', padding: token.paddingXXL }}>
-            <FileTextOutlined style={{ fontSize: 48, color: token.colorTextSecondary, marginBottom: token.marginMD }} />
-            <Title level={4} type="secondary">No Data Available</Title>
-            <p style={{ color: token.colorTextSecondary }}>
-              There are no records to display for this page. Try adjusting your filters or search criteria.
-            </p>
-          </Card>
-        ) : (
-          <Table
-            columns={tableColumns}
-            dataSource={tableData}
-            rowKey={(record, index) => record.id || record[config.columns[0]?.name] || index}
-            loading={isLoading}
-            pagination={{
-              current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: total,
-            showSizeChanger: true,
-            showTotal: (total, range) =>
-              `${range[0]}-${range[1]} of ${total} items`,
-            pageSizeOptions: ['10', '20', '50', '100'],
-          }}
-            onChange={handleTableChange}
-            scroll={{ x: 'max-content' }}
-          />
-        )}
+        {/* Data Table Component */}
+        <DataTable
+          config={config}
+          data={tableData}
+          total={total}
+          loading={isFetching && !!config}
+          pagination={pagination}
+          sorting={sorting}
+          onTableChange={handleTableChange}
+          onMoreClick={handleMoreClick}
+          token={token}
+        />
       </Card>
+
+      {/* Drawer for showing additional columns */}
+      <Drawer
+        title="Additional Details"
+        placement="right"
+        onClose={() => {
+          setDrawerVisible(false);
+          setSelectedRecord(null);
+        }}
+        open={drawerVisible}
+        width={600}
+      >
+        {selectedRecord && config && (
+          <Descriptions
+            bordered
+            column={1}
+            size="small"
+            labelStyle={{
+              fontWeight: token.fontWeightStrong,
+              width: '40%',
+              background: token.colorFillAlter,
+            }}
+            contentStyle={{
+              background: token.colorBgContainer,
+            }}
+          >
+            {config.columns.slice(5).map((col) => {
+              const value = selectedRecord[col.name];
+              let displayValue = '-';
+              if (value !== null && value !== undefined) {
+                if (col.type === 'date' && value) {
+                  displayValue = new Date(value).toLocaleDateString();
+                } else {
+                  displayValue = String(value);
+                }
+              }
+              return (
+                <Descriptions.Item key={col.name} label={col.label || col.name}>
+                  <div
+                    style={{
+                      wordBreak: 'break-word',
+                      color: token.colorText,
+                    }}
+                  >
+                    {displayValue}
+                  </div>
+                </Descriptions.Item>
+              );
+            })}
+          </Descriptions>
+        )}
+      </Drawer>
     </div>
   );
 }
