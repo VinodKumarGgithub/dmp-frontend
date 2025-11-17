@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useCallback } from 'react';
+import { useMemo, useEffect, useCallback, useState } from 'react';
 import {
   Card,
   Input,
@@ -30,6 +30,7 @@ import { showSuccess, showError } from '../utils/errorHandler';
 import useAuthStore from '../stores/authStore';
 import useDataPageStore from '../stores/dataPageStore';
 import DataTable from '../components/DataTable';
+import { useDebounce } from '../hooks/useDebounce';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -65,6 +66,21 @@ export default function DataPage() {
   const selectedRecord = pageState?.selectedRecord ?? null;
   const downloading = pageState?.downloading ?? false;
 
+  // Debounced values for API calls (500ms delay)
+  const debouncedSearchText = useDebounce(searchText, 500);
+  
+  // Track immediate filter updates (for Select and DatePicker)
+  const [immediateFilters, setImmediateFilters] = useState({});
+  
+  // Debounce text filter values (for Input fields)
+  // Select and DatePicker updates are immediate via immediateFilters
+  const debouncedFiltersValue = useDebounce(filters, 500);
+  
+  // Merge debounced filters with immediate filters (Select/DatePicker)
+  const mergedFilters = useMemo(() => {
+    return { ...debouncedFiltersValue, ...immediateFilters };
+  }, [debouncedFiltersValue, immediateFilters]);
+
   // Get store actions
   const setSearchText = useDataPageStore((state) => state.setSearchText);
   const setFilterValue = useDataPageStore((state) => state.setFilterValue);
@@ -75,6 +91,11 @@ export default function DataPage() {
   const setDownloading = useDataPageStore((state) => state.setDownloading);
   const resetPageState = useDataPageStore((state) => state.resetFilters);
 
+  // Reset immediate filters when page changes
+  useEffect(() => {
+    setImmediateFilters({});
+  }, [pageKey]);
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -83,15 +104,15 @@ export default function DataPage() {
     };
   }, [pageKey]);
 
-  // Build query params for API
+  // Build query params for API using debounced values
   const queryParams = useMemo(() => {
     const params = {
       page: pagination.current,
       pageSize: pagination.pageSize,
     };
 
-    if (searchText) {
-      params.search = searchText;
+    if (debouncedSearchText) {
+      params.search = debouncedSearchText;
     }
 
     if (sorting.field) {
@@ -99,15 +120,15 @@ export default function DataPage() {
       params.sortOrder = sorting.order || 'ASC';
     }
 
-    // Add filter values
-    Object.keys(filters).forEach((key) => {
-      if (filters[key] !== undefined && filters[key] !== null && filters[key] !== '') {
-        params[key] = filters[key];
+    // Add filter values (merged: debounced for text inputs, immediate for selects/dates)
+    Object.keys(mergedFilters).forEach((key) => {
+      if (mergedFilters[key] !== undefined && mergedFilters[key] !== null && mergedFilters[key] !== '') {
+        params[key] = mergedFilters[key];
       }
     });
 
     return params;
-  }, [searchText, filters, pagination, sorting]);
+  }, [debouncedSearchText, mergedFilters, pagination, sorting]);
 
   // Fetch page config and data
   // Use isFetching for table loading (shows loading on refetch)
@@ -127,8 +148,28 @@ export default function DataPage() {
     setSearchText(pageKey, value);
   };
 
-  const handleFilterChange = (fieldName, value) => {
+  const handleFilterChange = (fieldName, value, isImmediate = false) => {
     setFilterValue(pageKey, fieldName, value);
+    // For Select and DatePicker, update immediate filters for instant API call
+    if (isImmediate) {
+      setImmediateFilters((prev) => {
+        const newFilters = { ...prev };
+        // Remove filter if value is null/undefined/empty
+        if (value === null || value === undefined || value === '') {
+          delete newFilters[fieldName];
+        } else {
+          newFilters[fieldName] = value;
+        }
+        return newFilters;
+      });
+    } else {
+      // For text inputs, remove from immediate filters (will use debounced value)
+      setImmediateFilters((prev) => {
+        const newFilters = { ...prev };
+        delete newFilters[fieldName];
+        return newFilters;
+      });
+    }
   };
 
   const handleTableChange = (newPagination, newFilters, newSorter) => {
@@ -178,6 +219,8 @@ export default function DataPage() {
   const handleReset = () => {
     resetPageState(pageKey, config?.page_size_default || 20);
     form.resetFields();
+    // Reset immediate filters
+    setImmediateFilters({});
   };
 
   const handleMoreClick = (record) => {
@@ -385,7 +428,7 @@ export default function DataPage() {
                           placeholder={`Select ${field.label}`}
                           allowClear
                           style={{ width: '100%' }}
-                          onChange={(value) => handleFilterChange(field.name, value)}
+                          onChange={(value) => handleFilterChange(field.name, value, true)}
                           options={
                             field.options
                               ? field.options.map((opt) => ({ label: opt, value: opt }))
@@ -397,11 +440,11 @@ export default function DataPage() {
                           style={{ width: '100%' }}
                           onChange={(dates) => {
                             if (dates && dates[0] && dates[1]) {
-                              handleFilterChange(`${field.name}_from`, dates[0].format('YYYY-MM-DD'));
-                              handleFilterChange(`${field.name}_to`, dates[1].format('YYYY-MM-DD'));
+                              handleFilterChange(`${field.name}_from`, dates[0].format('YYYY-MM-DD'), true);
+                              handleFilterChange(`${field.name}_to`, dates[1].format('YYYY-MM-DD'), true);
                             } else {
-                              handleFilterChange(`${field.name}_from`, null);
-                              handleFilterChange(`${field.name}_to`, null);
+                              handleFilterChange(`${field.name}_from`, null, true);
+                              handleFilterChange(`${field.name}_to`, null, true);
                             }
                           }}
                         />
@@ -409,7 +452,7 @@ export default function DataPage() {
                         <Input
                           placeholder={`Filter by ${field.label}`}
                           allowClear
-                          onChange={(e) => handleFilterChange(field.name, e.target.value)}
+                          onChange={(e) => handleFilterChange(field.name, e.target.value, false)}
                         />
                       )}
                     </Form.Item>
