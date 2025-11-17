@@ -2,7 +2,9 @@ import { ProLayout } from '@ant-design/pro-layout';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { UserOutlined, LogoutOutlined, HomeOutlined, SettingOutlined, FileTextOutlined } from '@ant-design/icons';
 import { Dropdown, Space, Button, theme } from 'antd';
-import { useAuth } from '../contexts/AuthContext';
+import useAuthStore from '../stores/authStore';
+import { useQueryClient } from '@tanstack/react-query';
+import { logout as logoutApi } from '../api/auth';
 import TenantSelector from '../components/TenantSelector';
 import ThemeToggle from '../components/ThemeToggle';
 import { protectedRoutes } from '../config/routes';
@@ -10,11 +12,14 @@ import { protectedRoutes } from '../config/routes';
 export default function AppLayout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout, pagesConfig } = useAuth();
+  const user = useAuthStore((state) => state.user);
+  const pagesConfig = useAuthStore((state) => state.pagesConfig);
+  const logout = useAuthStore((state) => state.logout);
+  const queryClient = useQueryClient();
   const { token } = theme.useToken();
 
   const handleLogout = () => {
-    logout();
+    logout(logoutApi, queryClient);
     navigate('/login');
   };
 

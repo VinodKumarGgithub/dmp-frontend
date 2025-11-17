@@ -1,14 +1,15 @@
 import { Dropdown, Button, Spin, Typography, Space, theme as antdTheme } from 'antd';
 import { DatabaseOutlined, CheckOutlined } from '@ant-design/icons';
 import { useTenants } from '../api/tenants';
-import { useAuth } from '../contexts/AuthContext';
+import useAuthStore from '../stores/authStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { showSuccess } from '../utils/errorHandler';
 
 const { Text } = Typography;
 
 export default function TenantSelector() {
-  const { selectedTenant, setSelectedTenant } = useAuth();
+  const selectedTenant = useAuthStore((state) => state.selectedTenant);
+  const setSelectedTenant = useAuthStore((state) => state.setSelectedTenant);
   const queryClient = useQueryClient();
   const { token } = antdTheme.useToken();
 
@@ -17,20 +18,15 @@ export default function TenantSelector() {
   const tenants = tenantsData?.data || (Array.isArray(tenantsData) ? tenantsData : []);
 
   const handleTenantChange = (tenantId) => {
+    setSelectedTenant(tenantId);
+    
+    // Clear all cached queries when tenant changes
+    queryClient.clear();
+    
     if (tenantId) {
-      localStorage.setItem('tenantId', tenantId);
-      setSelectedTenant(tenantId);
-      
-      // Clear all cached queries when tenant changes
-      queryClient.clear();
-      
       // Show success message
       const tenant = tenants.find((t) => t.id === tenantId);
       showSuccess(`Switched to tenant: ${tenant?.name || tenantId}`);
-    } else {
-      localStorage.removeItem('tenantId');
-      setSelectedTenant(null);
-      queryClient.clear();
     }
   };
 

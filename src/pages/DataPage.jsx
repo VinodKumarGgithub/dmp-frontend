@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useEffect, useCallback } from 'react';
 import {
   Card,
   Input,
@@ -27,7 +27,8 @@ import { useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { usePage, downloadPageData } from '../api/pages';
 import { showSuccess, showError } from '../utils/errorHandler';
-import { useAuth } from '../contexts/AuthContext';
+import useAuthStore from '../stores/authStore';
+import useDataPageStore from '../stores/dataPageStore';
 import DataTable from '../components/DataTable';
 
 const { Title } = Typography;
@@ -36,20 +37,51 @@ const { RangePicker } = DatePicker;
 export default function DataPage() {
   const { pageKey } = useParams();
   const { token } = antdTheme.useToken();
-  const { selectedTenant } = useAuth();
+  const selectedTenant = useAuthStore((state) => state.selectedTenant);
   const [form] = Form.useForm();
 
-  // State for search, filters, pagination, and sorting
-  const [searchText, setSearchText] = useState('');
-  const [filters, setFilters] = useState({});
-  const [pagination, setPagination] = useState({
-    current: 1,
-    pageSize: 20,
-  });
-  const [sorting, setSorting] = useState({});
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState(null);
-  const [downloading, setDownloading] = useState(false);
+  // Stable default objects to avoid creating new ones on each render
+  const defaultFilters = useMemo(() => ({}), []);
+  const defaultPagination = useMemo(() => ({ current: 1, pageSize: 20 }), []);
+  const defaultSorting = useMemo(() => ({}), []);
+
+  // Ensure page state exists in store
+  const ensurePageState = useDataPageStore((state) => state.ensurePageState);
+  useEffect(() => {
+    if (pageKey) {
+      ensurePageState(pageKey);
+    }
+  }, [pageKey, ensurePageState]);
+
+  // Get page state from Zustand store - selector returns the state object
+  const pageState = useDataPageStore((state) => state.pageStates[pageKey]);
+  
+  // Use stable defaults when state doesn't exist yet
+  const searchText = pageState?.searchText ?? '';
+  const filters = pageState?.filters ?? defaultFilters;
+  const pagination = pageState?.pagination ?? defaultPagination;
+  const sorting = pageState?.sorting ?? defaultSorting;
+  const drawerVisible = pageState?.drawerVisible ?? false;
+  const selectedRecord = pageState?.selectedRecord ?? null;
+  const downloading = pageState?.downloading ?? false;
+
+  // Get store actions
+  const setSearchText = useDataPageStore((state) => state.setSearchText);
+  const setFilterValue = useDataPageStore((state) => state.setFilterValue);
+  const setPagination = useDataPageStore((state) => state.setPagination);
+  const setSorting = useDataPageStore((state) => state.setSorting);
+  const setDrawerVisible = useDataPageStore((state) => state.setDrawerVisible);
+  const setSelectedRecord = useDataPageStore((state) => state.setSelectedRecord);
+  const setDownloading = useDataPageStore((state) => state.setDownloading);
+  const resetPageState = useDataPageStore((state) => state.resetFilters);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Optionally reset state when leaving the page
+      // resetPageState(pageKey);
+    };
+  }, [pageKey]);
 
   // Build query params for API
   const queryParams = useMemo(() => {
@@ -92,31 +124,26 @@ export default function DataPage() {
   const total = pageData?.total || 0;
 
   const handleSearch = (value) => {
-    setSearchText(value);
-    setPagination({ ...pagination, current: 1 }); // Reset to first page on search
+    setSearchText(pageKey, value);
   };
 
   const handleFilterChange = (fieldName, value) => {
-    setFilters((prev) => ({
-      ...prev,
-      [fieldName]: value,
-    }));
-    setPagination({ ...pagination, current: 1 }); // Reset to first page on filter
+    setFilterValue(pageKey, fieldName, value);
   };
 
   const handleTableChange = (newPagination, newFilters, newSorter) => {
-    setPagination({
+    setPagination(pageKey, {
       current: newPagination.current,
       pageSize: newPagination.pageSize,
     });
 
     if (newSorter.field) {
-      setSorting({
+      setSorting(pageKey, {
         field: newSorter.field,
         order: newSorter.order === 'ascend' ? 'ASC' : 'DESC',
       });
     } else {
-      setSorting({});
+      setSorting(pageKey, {});
     }
   };
 
@@ -137,28 +164,25 @@ export default function DataPage() {
       return;
     }
 
-    setDownloading(true);
+    setDownloading(pageKey, true);
     try {
       await downloadPageData(pageKey, queryParams);
       showSuccess('Download completed successfully');
     } catch (error) {
       // Error already handled by downloadPageData
     } finally {
-      setDownloading(false);
+      setDownloading(pageKey, false);
     }
   };
 
   const handleReset = () => {
-    setSearchText('');
-    setFilters({});
-    setPagination({ current: 1, pageSize: config?.page_size_default || 20 });
-    setSorting({});
+    resetPageState(pageKey, config?.page_size_default || 20);
     form.resetFields();
   };
 
   const handleMoreClick = (record) => {
-    setSelectedRecord(record);
-    setDrawerVisible(true);
+    setSelectedRecord(pageKey, record);
+    setDrawerVisible(pageKey, true);
   };
 
   // Only show full page loading on initial config load
@@ -420,8 +444,8 @@ export default function DataPage() {
         title="Additional Details"
         placement="right"
         onClose={() => {
-          setDrawerVisible(false);
-          setSelectedRecord(null);
+          setDrawerVisible(pageKey, false);
+          setSelectedRecord(pageKey, null);
         }}
         open={drawerVisible}
         width={600}

@@ -1,0 +1,77 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+
+const useAuthStore = create(
+  persist(
+    (set, get) => ({
+      // State
+      user: null,
+      selectedTenant: null,
+      pagesConfig: [],
+      pagesLoading: false,
+
+      // Actions
+      setUser: (user) => set({ user }),
+      
+      setSelectedTenant: (tenantId) => {
+        set({ selectedTenant: tenantId });
+      },
+
+      setPagesConfig: (pagesConfig) => set({ pagesConfig }),
+      
+      setPagesLoading: (loading) => set({ pagesLoading: loading }),
+
+      login: async (username, password, loginApi, queryClient) => {
+        try {
+          const result = await loginApi(username, password);
+          
+          // Decode token to get user info
+          const payload = JSON.parse(atob(result.token.split('.')[1]));
+          const userData = {
+            username: payload.username,
+            role: payload.role,
+          };
+          
+          set({ user: userData });
+          
+          // Invalidate and refetch pages config immediately after login
+          if (queryClient) {
+            await queryClient.invalidateQueries({ queryKey: ['pages'] });
+            await queryClient.refetchQueries({ queryKey: ['pages'] });
+          }
+          
+          return result;
+        } catch (error) {
+          throw error;
+        }
+      },
+
+      logout: (logoutApi, queryClient) => {
+        if (logoutApi) {
+          logoutApi();
+        }
+        set({ 
+          user: null, 
+          selectedTenant: null,
+          pagesConfig: [],
+        });
+        if (queryClient) {
+          queryClient.clear(); // Clear all cached queries
+        }
+      },
+
+      // Computed
+      isAuthenticated: () => !!get().user,
+    }),
+    {
+      name: 'auth-storage',
+      partialize: (state) => ({
+        user: state.user,
+        selectedTenant: state.selectedTenant,
+      }),
+    }
+  )
+);
+
+export default useAuthStore;
+

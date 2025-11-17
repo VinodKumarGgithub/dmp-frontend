@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { message } from 'antd';
+import useAuthStore from '../stores/authStore';
 
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api',
@@ -18,8 +19,9 @@ axiosInstance.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Add tenant ID if available
-    const tenantId = localStorage.getItem('tenantId');
+    // Add tenant ID from Zustand store (fallback to localStorage for compatibility)
+    const store = useAuthStore.getState();
+    const tenantId = store.selectedTenant || localStorage.getItem('tenantId');
     if (tenantId) {
       config.headers['x-tenant-id'] = tenantId;
     }
