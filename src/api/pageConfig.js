@@ -66,3 +66,50 @@ export function useDeletePageConfig() {
   });
 }
 
+/**
+ * Get list of tables from tenant database
+ */
+export function useTables(options = {}) {
+  return useQuery({
+    queryKey: ['db', 'tables'],
+    queryFn: async () => {
+      const res = await axiosInstance.get('/pages/db/tables');
+      return res.data?.data || res.data || [];
+    },
+    enabled: options.enabled !== false,
+    ...options,
+  });
+}
+
+/**
+ * Get columns from a specific table
+ */
+export function useTableColumns(tableName, options = {}) {
+  return useQuery({
+    queryKey: ['db', 'tables', tableName, 'columns'],
+    queryFn: async () => {
+      if (!tableName) return [];
+      const res = await axiosInstance.get(`/pages/db/tables/${tableName}/columns`);
+      return res.data?.data || res.data || [];
+    },
+    enabled: !!tableName && (options.enabled !== false),
+    ...options,
+  });
+}
+
+/**
+ * Get index information for a specific table
+ */
+export function useTableIndexes(tableName, options = {}) {
+  return useQuery({
+    queryKey: ['db', 'tables', tableName, 'indexes'],
+    queryFn: async () => {
+      if (!tableName) return {};
+      const res = await axiosInstance.get(`/pages/db/tables/${tableName}/indexes`);
+      return res.data?.data || res.data || {};
+    },
+    enabled: !!tableName && (options.enabled !== false),
+    ...options,
+  });
+}
+

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Card,
   Table,
@@ -21,6 +21,8 @@ import {
   Col,
   Tabs,
   Tooltip,
+  Alert,
+  Spin,
 } from 'antd';
 import {
   PlusOutlined,
@@ -29,9 +31,12 @@ import {
   SettingOutlined,
   DeleteFilled,
   InfoCircleOutlined,
+  WarningOutlined,
+  CheckCircleOutlined,
 } from '@ant-design/icons';
 import { usePages } from '../api/pages';
-import { useCreatePageConfig, useUpdatePageConfig, useDeletePageConfig } from '../api/pageConfig';
+import { useCreatePageConfig, useUpdatePageConfig, useDeletePageConfig, useTables, useTableColumns, useTableIndexes } from '../api/pageConfig';
+import { useAuth } from '../contexts/AuthContext';
 import axiosInstance from '../api/axiosInstance';
 
 const { Title, Text } = Typography;
@@ -39,6 +44,7 @@ const { Option } = Select;
 
 export default function PageConfigManagement() {
   const { token } = antdTheme.useToken();
+  const { selectedTenant } = useAuth();
   const { data: pagesData, isLoading } = usePages();
   const createMutation = useCreatePageConfig();
   const updateMutation = useUpdatePageConfig();
@@ -48,12 +54,29 @@ export default function PageConfigManagement() {
   const [editingPage, setEditingPage] = useState(null);
   const [form] = Form.useForm();
   const [activeTab, setActiveTab] = useState('basic');
+  const [selectedTable, setSelectedTable] = useState(null);
 
   const pages = pagesData?.data || (Array.isArray(pagesData) ? pagesData : []);
+
+  // Fetch tables when modal is open and tenant is selected
+  const { data: tables = [], isLoading: tablesLoading } = useTables({
+    enabled: isModalOpen && !!selectedTenant,
+  });
+
+  // Fetch columns when table is selected
+  const { data: tableColumns = [], isLoading: columnsLoading } = useTableColumns(selectedTable, {
+    enabled: !!selectedTable && isModalOpen,
+  });
+
+  // Fetch indexes when table is selected
+  const { data: tableIndexes = {}, isLoading: indexesLoading } = useTableIndexes(selectedTable, {
+    enabled: !!selectedTable && isModalOpen,
+  });
 
   const handleAdd = () => {
     setEditingPage(null);
     setActiveTab('basic');
+    setSelectedTable(null);
     form.resetFields();
     form.setFieldsValue({
       page_size_default: 20,
@@ -73,6 +96,8 @@ export default function PageConfigManagement() {
       const response = await axiosInstance.get(`/pages/${page.page_key}/config`);
       const config = response.data || response;
       
+      setSelectedTable(config.data_source);
+      
       form.setFieldsValue({
         page_key: config.page_key,
         title: config.title,
@@ -90,6 +115,30 @@ export default function PageConfigManagement() {
       message.error('Failed to load page config');
     }
   };
+
+  // Handle table selection - auto-populate columns
+  const handleTableChange = (tableName) => {
+    setSelectedTable(tableName);
+    form.setFieldsValue({ data_source: tableName });
+    // Columns will be auto-populated via useEffect when tableColumns changes
+  };
+
+  // Auto-populate columns when table columns are loaded
+  useEffect(() => {
+    if (tableColumns.length > 0 && selectedTable && !editingPage) {
+      // Only auto-populate for new pages, not when editing
+      const currentColumns = form.getFieldValue('columns') || [];
+      // Only populate if columns are empty or have only one empty entry
+      if (currentColumns.length === 0 || (currentColumns.length === 1 && !currentColumns[0].name)) {
+        const mappedColumns = tableColumns.map(col => ({
+          name: col.name,
+          label: col.name.charAt(0).toUpperCase() + col.name.slice(1).replace(/_/g, ' '),
+          type: col.type,
+        }));
+        form.setFieldsValue({ columns: mappedColumns });
+      }
+    }
+  }, [tableColumns, selectedTable, editingPage, form]);
 
   const handleDelete = async (pageKey) => {
     try {
@@ -237,23 +286,54 @@ export default function PageConfigManagement() {
             <Input placeholder="e.g., Age Edit Data" />
           </Form.Item>
 
+          {!selectedTenant && (
+            <Alert
+              message="Please select a tenant first"
+              description="You need to select a tenant from the header to view available tables."
+              type="warning"
+              showIcon
+              style={{ marginBottom: token.marginMD }}
+            />
+          )}
           <Form.Item
             name="data_source"
             label={
               <Space>
-                <span>Database Table/View Name</span>
-                <Tooltip title="The name of the table or view in your database that contains the data">
+                <span>Database Table</span>
+                <Tooltip title="Select a table from your tenant database">
                   <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
                 </Tooltip>
               </Space>
             }
             rules={[
-              { required: true, message: 'Please enter data source' },
-              { pattern: /^[a-zA-Z_][a-zA-Z0-9_]*$/, message: 'Invalid table/view name format' },
+              { required: true, message: 'Please select a table' },
             ]}
           >
-            <Input placeholder="e.g., age_edits" />
+            <Select
+              placeholder="Select a table"
+              showSearch
+              allowClear
+              loading={tablesLoading}
+              disabled={!selectedTenant || tablesLoading}
+              onChange={handleTableChange}
+              filterOption={(input, option) =>
+                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+              }
+            >
+              {tables.map(table => (
+                <Option key={table} value={table} label={table}>
+                  {table}
+                </Option>
+              ))}
+            </Select>
           </Form.Item>
+          {selectedTable && columnsLoading && (
+            <Spin size="small" style={{ marginTop: token.marginXS }}>
+              <Text type="secondary" style={{ marginLeft: token.marginSM }}>
+                Loading columns...
+              </Text>
+            </Spin>
+          )}
 
           <Row gutter={16}>
             <Col span={12}>
@@ -376,38 +456,84 @@ export default function PageConfigManagement() {
               </Space>
             }
           >
-            <Form.Item name="searchable_fields" noStyle>
-              <Form.Item
-                noStyle
-                shouldUpdate={(prevValues, currentValues) =>
-                  JSON.stringify(prevValues.columns) !== JSON.stringify(currentValues.columns)
-                }
-              >
-                {({ getFieldValue }) => {
-                  const columns = getFieldValue('columns') || [];
-                  const validColumns = columns.filter(col => col && col.name);
-                  
-                  if (validColumns.length === 0) {
-                    return (
-                      <Text type="secondary">
-                        Add columns first, then select which ones should be searchable
-                      </Text>
-                    );
-                  }
-
+            <Form.Item
+              noStyle
+              shouldUpdate={(prevValues, currentValues) =>
+                JSON.stringify(prevValues.columns) !== JSON.stringify(currentValues.columns) ||
+                JSON.stringify(prevValues.searchable_fields) !== JSON.stringify(currentValues.searchable_fields)
+              }
+            >
+              {({ getFieldValue }) => {
+                const columns = getFieldValue('columns') || [];
+                const validColumns = columns.filter(col => col && col.name);
+                const searchableFields = getFieldValue('searchable_fields') || [];
+                
+                if (validColumns.length === 0) {
                   return (
-                    <Checkbox.Group style={{ width: '100%' }}>
+                    <Text type="secondary">
+                      Add columns first, then select which ones should be searchable
+                    </Text>
+                  );
+                }
+                
+                return (
+                  <>
+                    <Checkbox.Group 
+                      style={{ width: '100%' }}
+                      value={searchableFields}
+                      onChange={(checkedValues) => {
+                        form.setFieldsValue({ searchable_fields: checkedValues });
+                      }}
+                    >
                       <Row>
-                        {validColumns.map((col, index) => (
-                          <Col span={8} key={`${col.name}-${index}`}>
-                            <Checkbox value={col.name}>{col.label || col.name}</Checkbox>
-                          </Col>
-                        ))}
+                        {validColumns.map((col, index) => {
+                          const hasIndex = tableIndexes[col.name]?.hasIndex;
+                          const isSelected = searchableFields.includes(col.name);
+                          return (
+                            <Col span={8} key={`${col.name}-${index}`}>
+                              <Space>
+                                <Checkbox value={col.name}>{col.label || col.name}</Checkbox>
+                                {isSelected && selectedTable && (
+                                  hasIndex ? (
+                                    <Tooltip title="Indexed - Good for performance">
+                                      <CheckCircleOutlined style={{ color: token.colorSuccess }} />
+                                    </Tooltip>
+                                  ) : (
+                                    <Tooltip title="Not indexed - May impact search performance">
+                                      <WarningOutlined style={{ color: token.colorWarning }} />
+                                    </Tooltip>
+                                  )
+                                )}
+                              </Space>
+                            </Col>
+                          );
+                        })}
                       </Row>
                     </Checkbox.Group>
-                  );
-                }}
-              </Form.Item>
+                    {selectedTable && searchableFields.length > 0 && (
+                      <Alert
+                        message="Index Status"
+                        description={
+                          <div>
+                            {searchableFields.some(field => !tableIndexes[field]?.hasIndex) ? (
+                              <Text type="warning">
+                                Some searchable fields are not indexed. Consider adding indexes for better performance.
+                              </Text>
+                            ) : (
+                              <Text type="success">
+                                All searchable fields are indexed. Good for performance!
+                              </Text>
+                            )}
+                          </div>
+                        }
+                        type={searchableFields.some(field => !tableIndexes[field]?.hasIndex) ? 'warning' : 'success'}
+                        showIcon
+                        style={{ marginTop: token.marginMD }}
+                      />
+                    )}
+                  </>
+                );
+              }}
             </Form.Item>
             <Text type="secondary" style={{ fontSize: token.fontSizeSM, display: 'block', marginTop: token.marginXS }}>
               Select columns that users can search through
@@ -443,17 +569,42 @@ export default function PageConfigManagement() {
                         />
                       }
                     >
-                      <Row gutter={16}>
-                        <Col span={8}>
-                          <Form.Item
-                            {...restField}
-                            name={[name, 'name']}
-                            label="Field Name"
-                            rules={[{ required: true, message: 'Required' }]}
-                          >
-                            <Input placeholder="e.g., status" />
-                          </Form.Item>
-                        </Col>
+                      <Form.Item
+                        noStyle
+                        shouldUpdate={(prevValues, currentValues) =>
+                          prevValues.filterable_fields?.[name]?.name !== currentValues.filterable_fields?.[name]?.name
+                        }
+                      >
+                        {({ getFieldValue }) => {
+                          const fieldName = getFieldValue(['filterable_fields', name, 'name']);
+                          const hasIndex = fieldName && tableIndexes[fieldName]?.hasIndex;
+                          return (
+                            <Row gutter={16}>
+                              <Col span={8}>
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, 'name']}
+                                  label={
+                                    <Space>
+                                      <span>Field Name</span>
+                                      {fieldName && selectedTable && (
+                                        <Tooltip 
+                                          title={hasIndex ? "Indexed - Good for performance" : "Not indexed - May impact filter performance"}
+                                        >
+                                          {hasIndex ? (
+                                            <CheckCircleOutlined style={{ color: token.colorSuccess }} />
+                                          ) : (
+                                            <WarningOutlined style={{ color: token.colorWarning }} />
+                                          )}
+                                        </Tooltip>
+                                      )}
+                                    </Space>
+                                  }
+                                  rules={[{ required: true, message: 'Required' }]}
+                                >
+                                  <Input placeholder="e.g., status" />
+                                </Form.Item>
+                              </Col>
                         <Col span={8}>
                           <Form.Item
                             {...restField}
@@ -481,6 +632,9 @@ export default function PageConfigManagement() {
                           </Form.Item>
                         </Col>
                       </Row>
+                        );
+                        }}
+                      </Form.Item>
                       <Form.Item
                         noStyle
                         shouldUpdate={(prevValues, currentValues) =>
@@ -544,21 +698,49 @@ export default function PageConfigManagement() {
             <Form.Item
               noStyle
               shouldUpdate={(prevValues, currentValues) =>
-                JSON.stringify(prevValues.columns) !== JSON.stringify(currentValues.columns)
+                JSON.stringify(prevValues.columns) !== JSON.stringify(currentValues.columns) ||
+                prevValues.default_sort !== currentValues.default_sort
               }
             >
               {({ getFieldValue }) => {
                 const columns = getFieldValue('columns') || [];
                 const validColumns = columns.filter(col => col && col.name);
+                const sortField = getFieldValue('default_sort');
+                const hasIndex = sortField && tableIndexes[sortField]?.hasIndex;
                 
                 return (
-                  <Select placeholder="Select a column" allowClear>
-                    {validColumns.map((col, index) => (
-                      <Option key={`${col.name}-${index}`} value={col.name}>
-                        {col.label || col.name}
-                      </Option>
-                    ))}
-                  </Select>
+                  <>
+                    <Select placeholder="Select a column" allowClear>
+                      {validColumns.map((col, index) => (
+                        <Option key={`${col.name}-${index}`} value={col.name}>
+                          {col.label || col.name}
+                        </Option>
+                      ))}
+                    </Select>
+                    {sortField && selectedTable && (
+                      <div style={{ marginTop: token.marginXS }}>
+                        {hasIndex ? (
+                          <Alert
+                            message="Indexed"
+                            description="This field is indexed. Good for sort performance!"
+                            type="success"
+                            icon={<CheckCircleOutlined />}
+                            showIcon
+                            style={{ marginTop: token.marginXS }}
+                          />
+                        ) : (
+                          <Alert
+                            message="Not Indexed"
+                            description="This field is not indexed. Consider adding an index for better sort performance."
+                            type="warning"
+                            icon={<WarningOutlined />}
+                            showIcon
+                            style={{ marginTop: token.marginXS }}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </>
                 );
               }}
             </Form.Item>
