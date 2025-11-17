@@ -1,5 +1,5 @@
-import { Result, Button, Spin, Typography, Card, Space, Alert, theme } from 'antd';
-import { FileTextOutlined, ReloadOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
+import { Result, Button, Spin, Typography, Card, Space, Alert, theme, Breadcrumb } from 'antd';
+import { FileTextOutlined, ReloadOutlined, ExclamationCircleOutlined, HomeOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { usePages } from '../api/pages';
@@ -128,6 +128,19 @@ export default function HomePage() {
   // If pages exist, show them
   return (
     <div style={{ padding: token.paddingLG }}>
+      <Breadcrumb
+        style={{ marginBottom: token.marginMD }}
+        items={[
+          {
+            title: (
+              <Space>
+                <HomeOutlined />
+                <span>Home</span>
+              </Space>
+            ),
+          },
+        ]}
+      />
       <Card>
         <Title level={2}>Welcome to Clinical Data Management system</Title>
         <Paragraph>

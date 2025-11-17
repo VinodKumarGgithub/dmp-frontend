@@ -13,6 +13,7 @@ import {
   theme as antdTheme,
   Tag,
   Select,
+  Breadcrumb,
 } from 'antd';
 import {
   PlusOutlined,
@@ -20,9 +21,11 @@ import {
   DeleteOutlined,
   UserOutlined,
   LockOutlined,
+  HomeOutlined,
 } from '@ant-design/icons';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '../api/users';
 import { useAuth } from '../contexts/AuthContext';
+import { Link } from 'react-router-dom';
 
 const { Title } = Typography;
 
@@ -166,6 +169,26 @@ export default function UserManagement() {
 
   return (
     <div style={{ padding: token.paddingLG }}>
+      <Breadcrumb
+        style={{ marginBottom: token.marginMD }}
+        items={[
+          {
+            title: (
+              <Link to="/">
+                <HomeOutlined /> Home
+              </Link>
+            ),
+          },
+          {
+            title: (
+              <Space>
+                <UserOutlined />
+                <span>User Management</span>
+              </Space>
+            ),
+          },
+        ]}
+      />
       <Card>
         <div
           style={{

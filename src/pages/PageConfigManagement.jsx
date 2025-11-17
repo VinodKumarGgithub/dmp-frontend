@@ -23,6 +23,7 @@ import {
   Tooltip,
   Alert,
   Spin,
+  Breadcrumb,
 } from 'antd';
 import {
   PlusOutlined,
@@ -33,10 +34,12 @@ import {
   InfoCircleOutlined,
   WarningOutlined,
   CheckCircleOutlined,
+  HomeOutlined,
 } from '@ant-design/icons';
 import { usePages } from '../api/pages';
 import { useCreatePageConfig, useUpdatePageConfig, useDeletePageConfig, useTables, useTableColumns, useTableIndexes } from '../api/pageConfig';
 import { useAuth } from '../contexts/AuthContext';
+import { Link } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 
 const { Title, Text } = Typography;
@@ -776,6 +779,26 @@ export default function PageConfigManagement() {
 
   return (
     <div style={{ padding: token.paddingLG }}>
+      <Breadcrumb
+        style={{ marginBottom: token.marginMD }}
+        items={[
+          {
+            title: (
+              <Link to="/">
+                <HomeOutlined /> Home
+              </Link>
+            ),
+          },
+          {
+            title: (
+              <Space>
+                <SettingOutlined />
+                <span>Page Configuration</span>
+              </Space>
+            ),
+          },
+        ]}
+      />
       <Card>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: token.marginLG }}>
           <Title level={2} style={{ margin: 0 }}>

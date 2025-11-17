@@ -14,14 +14,17 @@ import {
   Col,
   Drawer,
   Descriptions,
+  Breadcrumb,
 } from 'antd';
 import {
   SearchOutlined,
   DownloadOutlined,
   ReloadOutlined,
   FileTextOutlined,
+  HomeOutlined,
 } from '@ant-design/icons';
 import { useParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { usePage, downloadPageData } from '../api/pages';
 import { showSuccess, showError } from '../utils/errorHandler';
 import { useAuth } from '../contexts/AuthContext';
@@ -176,40 +179,126 @@ export default function DataPage() {
 
   if (isError) {
     return (
-      <Card>
-        <Title level={4}>Error Loading Page</Title>
-        <p>{error?.message || error?.code || 'Failed to load page configuration'}</p>
-        {error?.details && <p style={{ color: token.colorTextSecondary }}>{JSON.stringify(error.details)}</p>}
-        <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ marginTop: token.marginMD }}>
-          Retry
-        </Button>
-      </Card>
+      <div style={{ padding: token.paddingLG }}>
+        <Breadcrumb
+          style={{ marginBottom: token.marginMD }}
+          items={[
+            {
+              title: (
+                <Link to="/">
+                  <HomeOutlined /> Home
+                </Link>
+              ),
+            },
+            {
+              title: (
+                <Space>
+                  <FileTextOutlined />
+                  <span>{pageKey}</span>
+                </Space>
+              ),
+            },
+          ]}
+        />
+        <Card>
+          <Title level={4}>Error Loading Page</Title>
+          <p>{error?.message || error?.code || 'Failed to load page configuration'}</p>
+          {error?.details && <p style={{ color: token.colorTextSecondary }}>{JSON.stringify(error.details)}</p>}
+          <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ marginTop: token.marginMD }}>
+            Retry
+          </Button>
+        </Card>
+      </div>
     );
   }
 
   if (!config) {
     return (
-      <Card>
-        <Title level={4}>Page Configuration Not Found</Title>
-        <p>The page configuration for "{pageKey}" could not be loaded.</p>
-        <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ marginTop: token.marginMD }}>
-          Retry
-        </Button>
-      </Card>
+      <div style={{ padding: token.paddingLG }}>
+        <Breadcrumb
+          style={{ marginBottom: token.marginMD }}
+          items={[
+            {
+              title: (
+                <Link to="/">
+                  <HomeOutlined /> Home
+                </Link>
+              ),
+            },
+            {
+              title: (
+                <Space>
+                  <FileTextOutlined />
+                  <span>{pageKey}</span>
+                </Space>
+              ),
+            },
+          ]}
+        />
+        <Card>
+          <Title level={4}>Page Configuration Not Found</Title>
+          <p>The page configuration for "{pageKey}" could not be loaded.</p>
+          <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ marginTop: token.marginMD }}>
+            Retry
+          </Button>
+        </Card>
+      </div>
     );
   }
 
   if (!selectedTenant) {
     return (
-      <Card>
-        <Title level={4}>Tenant Required</Title>
-        <p>Please select a tenant from the dropdown in the header to view this page.</p>
-      </Card>
+      <div style={{ padding: token.paddingLG }}>
+        <Breadcrumb
+          style={{ marginBottom: token.marginMD }}
+          items={[
+            {
+              title: (
+                <Link to="/">
+                  <HomeOutlined /> Home
+                </Link>
+              ),
+            },
+            {
+              title: (
+                <Space>
+                  <FileTextOutlined />
+                  <span>{config?.title || pageKey}</span>
+                </Space>
+              ),
+            },
+          ]}
+        />
+        <Card>
+          <Title level={4}>Tenant Required</Title>
+          <p>Please select a tenant from the dropdown in the header to view this page.</p>
+        </Card>
+      </div>
     );
   }
 
   return (
     <div style={{ padding: token.paddingLG }}>
+      <Breadcrumb
+        style={{ marginBottom: token.marginMD }}
+        items={[
+          {
+            title: (
+              <Link to="/">
+                <HomeOutlined /> Home
+              </Link>
+            ),
+          },
+          {
+            title: (
+              <Space>
+                <FileTextOutlined />
+                <span>{config.title || pageKey}</span>
+              </Space>
+            ),
+          },
+        ]}
+      />
       <Card>
         <div
           style={{
