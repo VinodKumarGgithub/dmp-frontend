@@ -16,56 +16,114 @@ export default function DataTable({
   onMoreClick,
   token,
 }) {
-  // Build table columns from config
+  // Build table columns from config or data
   const tableColumns = useMemo(() => {
-    if (!config?.columns) return [];
+    // If columns are specified in config, use them
+    if (config?.columns && Array.isArray(config.columns) && config.columns.length > 0) {
+      const allColumns = config.columns;
+      const maxVisibleColumns = 5;
+      const visibleColumns = allColumns.slice(0, maxVisibleColumns);
+      const hiddenColumns = allColumns.slice(maxVisibleColumns);
 
-    const allColumns = config.columns;
-    const maxVisibleColumns = 5;
-    const visibleColumns = allColumns.slice(0, maxVisibleColumns);
-    const hiddenColumns = allColumns.slice(maxVisibleColumns);
-
-    // Build visible columns
-    const columns = visibleColumns.map((col) => ({
-      title: col.label || col.name,
-      dataIndex: col.name,
-      key: col.name,
-      width: col.width,
-      sorter: true,
-      render: (value) => {
-        if (value === null || value === undefined) return '-';
-        if (col.type === 'date' && value) {
-          return new Date(value).toLocaleDateString();
-        }
-        return String(value);
-      },
-    }));
-
-    // Add "More" column if there are hidden columns
-    if (hiddenColumns.length > 0) {
-      columns.push({
-        title: 'More',
-        key: 'more',
-        width: 100,
-        fixed: 'right',
-        render: (_, record) => {
-          return (
-            <Button
-              type="link"
-              icon={<MoreOutlined />}
-              size="small"
-              onClick={() => onMoreClick(record)}
-              style={{ color: token.colorPrimary }}
-            >
-              {/* View More */}
-            </Button>
-          );
+      // Build visible columns
+      const columns = visibleColumns.map((col) => ({
+        title: col.label || col.name,
+        dataIndex: col.name,
+        key: col.name,
+        width: col.width,
+        sorter: true,
+        render: (value) => {
+          if (value === null || value === undefined) return '-';
+          if (col.type === 'date' && value) {
+            return new Date(value).toLocaleDateString();
+          }
+          return String(value);
         },
-      });
+      }));
+
+      // Add "More" column if there are hidden columns
+      if (hiddenColumns.length > 0) {
+        columns.push({
+          title: 'More',
+          key: 'more',
+          width: 100,
+          fixed: 'right',
+          render: (_, record) => {
+            return (
+              <Button
+                type="link"
+                icon={<MoreOutlined />}
+                size="small"
+                onClick={() => onMoreClick(record)}
+                style={{ color: token.colorPrimary }}
+              >
+                {/* View More */}
+              </Button>
+            );
+          },
+        });
+      }
+
+      return columns;
     }
 
-    return columns;
-  }, [config, token, onMoreClick]);
+    // If columns are not specified, generate from data (SELECT *)
+    if (Array.isArray(data) && data.length > 0) {
+      // Get all unique keys from the first record
+      const firstRecord = data[0];
+      const allKeys = Object.keys(firstRecord);
+      const maxVisibleColumns = 5;
+      const visibleKeys = allKeys.slice(0, maxVisibleColumns);
+      const hiddenKeys = allKeys.slice(maxVisibleColumns);
+
+      // Build visible columns
+      const columns = visibleKeys.map((key) => ({
+        title: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
+        dataIndex: key,
+        key: key,
+        sorter: true,
+        render: (value) => {
+          if (value === null || value === undefined) return '-';
+          // Try to detect date format
+          if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+            try {
+              return new Date(value).toLocaleDateString();
+            } catch {
+              return String(value);
+            }
+          }
+          return String(value);
+        },
+      }));
+
+      // Add "More" column if there are hidden columns
+      if (hiddenKeys.length > 0) {
+        columns.push({
+          title: 'More',
+          key: 'more',
+          width: 100,
+          fixed: 'right',
+          render: (_, record) => {
+            return (
+              <Button
+                type="link"
+                icon={<MoreOutlined />}
+                size="small"
+                onClick={() => onMoreClick(record)}
+                style={{ color: token.colorPrimary }}
+              >
+                {/* View More */}
+              </Button>
+            );
+          },
+        });
+      }
+
+      return columns;
+    }
+
+    return [];
+  }, [config, data, token, onMoreClick]);
 
   // Generate unique row key from record data - MUST be before any early returns
   const getRowKey = useMemo(() => {
@@ -73,14 +131,15 @@ export default function DataTable({
       // Try to find a unique identifier in the record
       if (record.id) return String(record.id);
       
-      // Try first column value
-      const firstColumn = config?.columns?.[0]?.name;
-      if (firstColumn && record[firstColumn] !== undefined && record[firstColumn] !== null) {
-        return String(record[firstColumn]);
-      }
-      
-      // Generate key from multiple column values as fallback
-      if (config?.columns) {
+      // If columns are specified, use them
+      if (config?.columns && Array.isArray(config.columns) && config.columns.length > 0) {
+        // Try first column value
+        const firstColumn = config.columns[0]?.name;
+        if (firstColumn && record[firstColumn] !== undefined && record[firstColumn] !== null) {
+          return String(record[firstColumn]);
+        }
+        
+        // Generate key from multiple column values as fallback
         const keyParts = config.columns
           .slice(0, 3)
           .map(col => record[col.name])
@@ -89,6 +148,20 @@ export default function DataTable({
         
         if (keyParts.length > 0) {
           return keyParts.join('_');
+        }
+      } else {
+        // If columns are not specified, use first few keys from record
+        const keys = Object.keys(record);
+        if (keys.length > 0) {
+          const keyParts = keys
+            .slice(0, 3)
+            .map(key => record[key])
+            .filter(val => val !== undefined && val !== null)
+            .map(val => String(val));
+          
+          if (keyParts.length > 0) {
+            return keyParts.join('_');
+          }
         }
       }
       

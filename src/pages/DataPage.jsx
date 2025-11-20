@@ -493,7 +493,7 @@ export default function DataPage() {
         open={drawerVisible}
         width={600}
       >
-        {selectedRecord && config && (
+        {selectedRecord && (
           <Descriptions
             bordered
             column={1}
@@ -507,7 +507,10 @@ export default function DataPage() {
               background: token.colorBgContainer,
             }}
           >
-            {config.columns.slice(5).map((col) => {
+            {(() => {
+              // If columns are specified in config, use them (beyond first 5)
+              if (config?.columns && Array.isArray(config.columns) && config.columns.length > 5) {
+                return config.columns.slice(5).map((col) => {
               const value = selectedRecord[col.name];
               let displayValue = '-';
               if (value !== null && value !== undefined) {
@@ -529,7 +532,41 @@ export default function DataPage() {
                   </div>
                 </Descriptions.Item>
               );
-            })}
+                });
+              }
+              
+              // If columns are not specified, show all fields beyond first 5
+              const allKeys = Object.keys(selectedRecord);
+              const hiddenKeys = allKeys.slice(5);
+              return hiddenKeys.map((key) => {
+                const value = selectedRecord[key];
+                let displayValue = '-';
+                if (value !== null && value !== undefined) {
+                  // Try to detect date format
+                  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+                    try {
+                      displayValue = new Date(value).toLocaleDateString();
+                    } catch {
+                      displayValue = String(value);
+                    }
+                  } else {
+                    displayValue = String(value);
+                  }
+                }
+                return (
+                  <Descriptions.Item key={key} label={key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}>
+                    <div
+                      style={{
+                        wordBreak: 'break-word',
+                        color: token.colorText,
+                      }}
+                    >
+                      {displayValue}
+                    </div>
+                  </Descriptions.Item>
+                );
+              });
+            })()}
           </Descriptions>
         )}
       </Drawer>

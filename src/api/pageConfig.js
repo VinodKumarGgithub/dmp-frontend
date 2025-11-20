@@ -67,7 +67,7 @@ export function useDeletePageConfig() {
 }
 
 /**
- * Get list of tables from tenant database
+ * Get list of tables and views from tenant database
  */
 export function useTables(options = {}) {
   return useQuery({
@@ -82,7 +82,7 @@ export function useTables(options = {}) {
 }
 
 /**
- * Get columns from a specific table
+ * Get columns from a specific table or view
  */
 export function useTableColumns(tableName, options = {}) {
   return useQuery({

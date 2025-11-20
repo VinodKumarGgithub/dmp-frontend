@@ -81,13 +81,15 @@ export default function PageConfigManagement() {
     setActiveTab('basic');
     setSelectedTable(null);
     form.resetFields();
-    form.setFieldsValue({
-      page_size_default: 20,
-      is_download_allowed: false,
-      columns: [{ name: '', label: '', type: 'string' }],
-      searchable_fields: [],
-      filterable_fields: [],
-    });
+      form.setFieldsValue({
+        page_size_default: 20,
+        is_download_allowed: false,
+        source_type: 'TABLE',
+        source_params: [],
+        columns: [{ name: '', label: '', type: 'string' }],
+        searchable_fields: [],
+        filterable_fields: [],
+      });
     setIsModalOpen(true);
   };
 
@@ -105,6 +107,8 @@ export default function PageConfigManagement() {
         page_key: config.page_key,
         title: config.title,
         data_source: config.data_source,
+        source_type: config.source_type || 'TABLE',
+        source_params: config.source_params || [],
         columns: config.columns || [],
         searchable_fields: config.searchable_fields || [],
         filterable_fields: config.filterable_fields || [],
@@ -123,7 +127,17 @@ export default function PageConfigManagement() {
   const handleTableChange = (tableName) => {
     setSelectedTable(tableName);
     form.setFieldsValue({ data_source: tableName });
-    // Columns will be auto-populated via useEffect when tableColumns changes
+    // Columns will be auto-populate via useEffect when tableColumns changes
+  };
+
+  // Handle source type change - clear data source selection
+  const handleSourceTypeChange = (sourceType) => {
+    form.setFieldsValue({ 
+      source_type: sourceType,
+      data_source: undefined,
+      source_params: []
+    });
+    setSelectedTable(null);
   };
 
   // Auto-populate columns when table columns are loaded
@@ -156,13 +170,8 @@ export default function PageConfigManagement() {
       // Get columns from form list
       const columns = form.getFieldValue('columns') || [];
       
-      // Filter out empty columns
+      // Filter out empty columns (allow empty array - will use SELECT *)
       const validColumns = columns.filter(col => col.name && col.label);
-      
-      if (validColumns.length === 0) {
-        message.error('Please add at least one column');
-        return;
-      }
 
       // Get searchable fields (array of column names)
       const searchable_fields = form.getFieldValue('searchable_fields') || [];
@@ -177,10 +186,16 @@ export default function PageConfigManagement() {
         order: values.default_sort_order || 'ASC',
       } : null;
 
+      // Get source parameters
+      const source_params = form.getFieldValue('source_params') || [];
+      const validSourceParams = source_params.filter(p => p.name);
+
       const submitData = {
         page_key: values.page_key,
         title: values.title,
         data_source: values.data_source,
+        source_type: values.source_type || 'TABLE',
+        source_params: validSourceParams,
         columns: validColumns,
         searchable_fields: searchable_fields,
         filterable_fields: validFilters,
@@ -292,43 +307,189 @@ export default function PageConfigManagement() {
           {!selectedTenant && (
             <Alert
               message="Please select a tenant first"
-              description="You need to select a tenant from the header to view available tables."
+              description="You need to select a tenant from the header to view available tables and views."
               type="warning"
               showIcon
               style={{ marginBottom: token.marginMD }}
             />
           )}
           <Form.Item
-            name="data_source"
+            name="source_type"
             label={
               <Space>
-                <span>Database Table</span>
-                <Tooltip title="Select a table from your tenant database">
+                <span>Source Type</span>
+                <Tooltip title="Select the type of data source">
                   <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
                 </Tooltip>
               </Space>
             }
             rules={[
-              { required: true, message: 'Please select a table' },
+              { required: true, message: 'Please select source type' },
+            ]}
+            initialValue="TABLE"
+          >
+            <Select onChange={handleSourceTypeChange}>
+              <Option value="TABLE">Table</Option>
+              <Option value="VIEW">View</Option>
+              <Option value="PROCEDURE">Stored Procedure</Option>
+            </Select>
+          </Form.Item>
+          <Form.Item
+            name="data_source"
+            label={
+              <Space>
+                <span>Data Source</span>
+                <Tooltip title="Select a table, view, or procedure from your tenant database">
+                  <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                </Tooltip>
+              </Space>
+            }
+            rules={[
+              { required: true, message: 'Please select a data source' },
             ]}
           >
-            <Select
-              placeholder="Select a table"
-              showSearch
-              allowClear
-              loading={tablesLoading}
-              disabled={!selectedTenant || tablesLoading}
-              onChange={handleTableChange}
-              filterOption={(input, option) =>
-                (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
-              }
+            <Form.Item
+              noStyle
+              shouldUpdate={(prevValues, currentValues) => prevValues.source_type !== currentValues.source_type}
             >
-              {tables.map(table => (
-                <Option key={table} value={table} label={table}>
-                  {table}
-                </Option>
-              ))}
-            </Select>
+              {({ getFieldValue }) => {
+                const sourceType = getFieldValue('source_type') || 'TABLE';
+                // Filter tables based on source_type
+                const filteredDataSources = Array.isArray(tables) 
+                  ? tables.filter(ds => {
+                      // Handle both old format (string) and new format (object with name and type)
+                      if (typeof ds === 'string') {
+                        // Legacy format - show all if source_type is TABLE
+                        return sourceType === 'TABLE';
+                      }
+                      // New format - filter by type
+                      return ds.type === sourceType;
+                    })
+                  : [];
+                
+                return (
+                  <Select
+                    placeholder={`Select a ${sourceType.toLowerCase()}`}
+                    showSearch
+                    allowClear
+                    loading={tablesLoading}
+                    disabled={!selectedTenant || tablesLoading}
+                    onChange={handleTableChange}
+                    filterOption={(input, option) =>
+                      (option?.label ?? '').toLowerCase().includes(input.toLowerCase())
+                    }
+                    notFoundContent={
+                      filteredDataSources.length === 0 && !tablesLoading
+                        ? `No ${sourceType.toLowerCase()}s found`
+                        : null
+                    }
+                  >
+                    {filteredDataSources.map(ds => {
+                      const name = typeof ds === 'string' ? ds : ds.name;
+                      const type = typeof ds === 'string' ? 'TABLE' : ds.type;
+                      return (
+                        <Option key={name} value={name} label={name}>
+                          <Space>
+                            <span>{name}</span>
+                            <Tag color={type === 'TABLE' ? 'blue' : type === 'VIEW' ? 'green' : 'purple'} size="small">
+                              {type}
+                            </Tag>
+                          </Space>
+                        </Option>
+                      );
+                    })}
+                  </Select>
+                );
+              }}
+            </Form.Item>
+          </Form.Item>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) => prevValues.source_type !== currentValues.source_type}
+          >
+            {({ getFieldValue }) => {
+              const sourceType = getFieldValue('source_type');
+              if (sourceType === 'PROCEDURE' || sourceType === 'VIEW') {
+                return (
+                  <Form.List name="source_params">
+                    {(fields, { add, remove }) => (
+                      <>
+                        <Divider orientation="left" style={{ marginTop: token.marginMD }}>
+                          <Space>
+                            <span>Parameters</span>
+                            <Tooltip title="Configure parameters for the procedure or view">
+                              <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                            </Tooltip>
+                          </Space>
+                        </Divider>
+                        {fields.map(({ key, name, ...restField }) => (
+                          <Card
+                            key={key}
+                            size="small"
+                            style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
+                            extra={
+                              <Button
+                                type="text"
+                                danger
+                                icon={<DeleteFilled />}
+                                onClick={() => remove(name)}
+                              />
+                            }
+                          >
+                            <Row gutter={16}>
+                              <Col span={8}>
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, 'name']}
+                                  label="Parameter Name"
+                                  rules={[{ required: true, message: 'Required' }]}
+                                >
+                                  <Input placeholder="e.g., start_date" />
+                                </Form.Item>
+                              </Col>
+                              <Col span={6}>
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, 'type']}
+                                  label="Type"
+                                  initialValue="string"
+                                >
+                                  <Select>
+                                    <Option value="string">String</Option>
+                                    <Option value="number">Number</Option>
+                                    <Option value="boolean">Boolean</Option>
+                                    <Option value="date">Date</Option>
+                                  </Select>
+                                </Form.Item>
+                              </Col>
+                              <Col span={10}>
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, 'value']}
+                                  label="Default Value"
+                                >
+                                  <Input placeholder="Optional default value" />
+                                </Form.Item>
+                              </Col>
+                            </Row>
+                          </Card>
+                        ))}
+                        <Button
+                          type="dashed"
+                          onClick={() => add({ name: '', type: 'string', value: '' })}
+                          block
+                          icon={<PlusOutlined />}
+                          style={{ marginBottom: token.marginMD }}
+                        >
+                          Add Parameter
+                        </Button>
+                      </>
+                    )}
+                  </Form.List>
+                );
+              }
+              return null;
+            }}
           </Form.Item>
           {selectedTable && columnsLoading && (
             <Spin size="small" style={{ marginTop: token.marginXS }}>
@@ -374,14 +535,12 @@ export default function PageConfigManagement() {
                   size="small"
                   style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
                   extra={
-                    fields.length > 1 && (
-                      <Button
-                        type="text"
-                        danger
-                        icon={<DeleteFilled />}
-                        onClick={() => remove(name)}
-                      />
-                    )
+                    <Button
+                      type="text"
+                      danger
+                      icon={<DeleteFilled />}
+                      onClick={() => remove(name)}
+                    />
                   }
                 >
                   <Row gutter={16}>
