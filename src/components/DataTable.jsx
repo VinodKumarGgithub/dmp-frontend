@@ -217,7 +217,16 @@ export default function DataTable({
         total: total,
         showSizeChanger: true,
         showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
-        pageSizeOptions: ['10', '20', '50', '100'],
+        pageSizeOptions: (() => {
+          // Include config's default page size in options if not already present
+          const defaultOptions = ['10', '20', '50', '100'];
+          const defaultPageSize = config?.page_size_default;
+          if (defaultPageSize && !defaultOptions.includes(String(defaultPageSize))) {
+            const options = [...defaultOptions, String(defaultPageSize)];
+            return options.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+          }
+          return defaultOptions;
+        })(),
       }}
       onChange={onTableChange}
       scroll={{ x: 'max-content' }}

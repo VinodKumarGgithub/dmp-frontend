@@ -43,7 +43,6 @@ export default function DataPage() {
 
   // Stable default objects to avoid creating new ones on each render
   const defaultFilters = useMemo(() => ({}), []);
-  const defaultPagination = useMemo(() => ({ current: 1, pageSize: 20 }), []);
   const defaultSorting = useMemo(() => ({}), []);
 
   // Ensure page state exists in store
@@ -57,10 +56,19 @@ export default function DataPage() {
   // Get page state from Zustand store - selector returns the state object
   const pageState = useDataPageStore((state) => state.pageStates[pageKey]);
   
+  // Get store actions
+  const setSearchText = useDataPageStore((state) => state.setSearchText);
+  const setFilterValue = useDataPageStore((state) => state.setFilterValue);
+  const setPagination = useDataPageStore((state) => state.setPagination);
+  const setSorting = useDataPageStore((state) => state.setSorting);
+  const setDrawerVisible = useDataPageStore((state) => state.setDrawerVisible);
+  const setSelectedRecord = useDataPageStore((state) => state.setSelectedRecord);
+  const setDownloading = useDataPageStore((state) => state.setDownloading);
+  const resetPageState = useDataPageStore((state) => state.resetFilters);
+
   // Use stable defaults when state doesn't exist yet
   const searchText = pageState?.searchText ?? '';
   const filters = pageState?.filters ?? defaultFilters;
-  const pagination = pageState?.pagination ?? defaultPagination;
   const sorting = pageState?.sorting ?? defaultSorting;
   const drawerVisible = pageState?.drawerVisible ?? false;
   const selectedRecord = pageState?.selectedRecord ?? null;
@@ -81,16 +89,6 @@ export default function DataPage() {
     return { ...debouncedFiltersValue, ...immediateFilters };
   }, [debouncedFiltersValue, immediateFilters]);
 
-  // Get store actions
-  const setSearchText = useDataPageStore((state) => state.setSearchText);
-  const setFilterValue = useDataPageStore((state) => state.setFilterValue);
-  const setPagination = useDataPageStore((state) => state.setPagination);
-  const setSorting = useDataPageStore((state) => state.setSorting);
-  const setDrawerVisible = useDataPageStore((state) => state.setDrawerVisible);
-  const setSelectedRecord = useDataPageStore((state) => state.setSelectedRecord);
-  const setDownloading = useDataPageStore((state) => state.setDownloading);
-  const resetPageState = useDataPageStore((state) => state.resetFilters);
-
   // Reset immediate filters when page changes
   useEffect(() => {
     setImmediateFilters({});
@@ -107,8 +105,8 @@ export default function DataPage() {
   // Build query params for API using debounced values
   const queryParams = useMemo(() => {
     const params = {
-      page: pagination.current,
-      pageSize: pagination.pageSize,
+      page: (pageState?.pagination?.current || 1),
+      pageSize: (pageState?.pagination?.pageSize || 20),
     };
 
     if (debouncedSearchText) {
@@ -128,7 +126,7 @@ export default function DataPage() {
     });
 
     return params;
-  }, [debouncedSearchText, mergedFilters, pagination, sorting]);
+  }, [debouncedSearchText, mergedFilters, pageState?.pagination, sorting]);
 
   // Fetch page config and data
   // Use isFetching for table loading (shows loading on refetch)
@@ -143,6 +141,25 @@ export default function DataPage() {
   const config = pageData?.config;
   const tableData = Array.isArray(pageData?.data) ? pageData.data : [];
   const total = pageData?.total || 0;
+  
+  // Initialize pagination with config's page_size_default when config loads
+  useEffect(() => {
+    if (config?.page_size_default && pageState) {
+      const currentPageSize = pageState.pagination?.pageSize;
+      // Only update if pagination hasn't been set or is still using default 20
+      if (!currentPageSize || (currentPageSize === 20 && config.page_size_default !== 20)) {
+        setPagination(pageKey, {
+          current: pageState.pagination?.current || 1,
+          pageSize: config.page_size_default,
+        });
+      }
+    }
+  }, [config?.page_size_default, pageKey, pageState, setPagination]);
+  
+  // Use config's page_size_default for default pagination, fallback to store value or 20
+  const defaultPageSize = config?.page_size_default || pageState?.pagination?.pageSize || 20;
+  const defaultPagination = useMemo(() => ({ current: 1, pageSize: defaultPageSize }), [defaultPageSize]);
+  const pagination = pageState?.pagination ?? defaultPagination;
 
   const handleSearch = (value) => {
     setSearchText(pageKey, value);

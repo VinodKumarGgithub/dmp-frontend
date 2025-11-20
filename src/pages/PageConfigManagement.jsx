@@ -126,7 +126,11 @@ export default function PageConfigManagement() {
   // Handle table selection - auto-populate columns
   const handleTableChange = (tableName) => {
     setSelectedTable(tableName);
-    form.setFieldsValue({ data_source: tableName });
+    form.setFieldsValue({ 
+      data_source: tableName,
+      // Clear columns when data source changes so they can be repopulated
+      columns: []
+    });
     // Columns will be auto-populate via useEffect when tableColumns changes
   };
 
@@ -142,11 +146,17 @@ export default function PageConfigManagement() {
 
   // Auto-populate columns when table columns are loaded
   useEffect(() => {
-    if (tableColumns.length > 0 && selectedTable && !editingPage) {
-      // Only auto-populate for new pages, not when editing
+    if (tableColumns.length > 0 && selectedTable) {
       const currentColumns = form.getFieldValue('columns') || [];
-      // Only populate if columns are empty or have only one empty entry
-      if (currentColumns.length === 0 || (currentColumns.length === 1 && !currentColumns[0].name)) {
+      const currentDataSource = form.getFieldValue('data_source');
+      
+      // Only auto-populate if:
+      // 1. Columns are empty or have only one empty entry
+      // 2. AND (not editing OR data source has changed)
+      const shouldPopulate = (currentColumns.length === 0 || (currentColumns.length === 1 && !currentColumns[0].name)) &&
+                             (!editingPage || currentDataSource === selectedTable);
+      
+      if (shouldPopulate) {
         const mappedColumns = tableColumns.map(col => ({
           name: col.name,
           label: col.name.charAt(0).toUpperCase() + col.name.slice(1).replace(/_/g, ' '),
@@ -654,7 +664,14 @@ export default function PageConfigManagement() {
                           return (
                             <Col span={8} key={`${col.name}-${index}`}>
                               <Space>
-                                <Checkbox value={col.name}>{col.label || col.name}</Checkbox>
+                                <Checkbox value={col.name}>
+                                  {col.name}
+                                  {col.label && col.label !== col.name && (
+                                    <Text type="secondary" style={{ marginLeft: token.marginXS }}>
+                                      ({col.label})
+                                    </Text>
+                                  )}
+                                </Checkbox>
                                 {isSelected && selectedTable && (
                                   hasIndex ? (
                                     <Tooltip title="Indexed - Good for performance">
