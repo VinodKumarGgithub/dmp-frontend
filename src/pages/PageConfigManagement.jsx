@@ -37,7 +37,7 @@ import {
   HomeOutlined,
 } from '@ant-design/icons';
 import { usePages } from '../api/pages';
-import { useCreatePageConfig, useUpdatePageConfig, useDeletePageConfig, useTables, useTableColumns, useTableIndexes } from '../api/pageConfig';
+import { useCreatePageConfig, useUpdatePageConfig, useDeletePageConfig, useTables, useTableColumns, useTableIndexes, useProcedureParameters } from '../api/pageConfig';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
@@ -66,20 +66,38 @@ export default function PageConfigManagement() {
     enabled: isModalOpen && !!selectedTenant,
   });
 
-  // Fetch columns when table is selected
-  const { data: tableColumns = [], isLoading: columnsLoading } = useTableColumns(selectedTable, {
-    enabled: !!selectedTable && isModalOpen,
-  });
+  // Track source type in state
+  const [currentSourceType, setCurrentSourceType] = useState('TABLE');
+
+  // Fetch columns when table/view is selected
+  const { data: tableColumns = [], isLoading: columnsLoading } = useTableColumns(
+    (currentSourceType === 'TABLE' || currentSourceType === 'VIEW') ? selectedTable : null, 
+    {
+      enabled: (currentSourceType === 'TABLE' || currentSourceType === 'VIEW') && !!selectedTable && isModalOpen,
+    }
+  );
 
   // Fetch indexes when table is selected
-  const { data: tableIndexes = {}, isLoading: indexesLoading } = useTableIndexes(selectedTable, {
-    enabled: !!selectedTable && isModalOpen,
-  });
+  const { data: tableIndexes = {}, isLoading: indexesLoading } = useTableIndexes(
+    currentSourceType === 'TABLE' ? selectedTable : null,
+    {
+      enabled: currentSourceType === 'TABLE' && !!selectedTable && isModalOpen,
+    }
+  );
+
+  // Fetch procedure parameters when procedure is selected
+  const { data: procedureParameters = [], isLoading: procedureParamsLoading } = useProcedureParameters(
+    currentSourceType === 'PROCEDURE' ? selectedTable : null,
+    {
+      enabled: currentSourceType === 'PROCEDURE' && !!selectedTable && isModalOpen,
+    }
+  );
 
   const handleAdd = () => {
     setEditingPage(null);
     setActiveTab('basic');
     setSelectedTable(null);
+    setCurrentSourceType('TABLE');
     form.resetFields();
       form.setFieldsValue({
         page_size_default: 20,
@@ -101,13 +119,15 @@ export default function PageConfigManagement() {
       const response = await axiosInstance.get(`/pages/${page.page_key}/config`);
       const config = response.data || response;
       
+      const sourceType = config.source_type || 'TABLE';
+      setCurrentSourceType(sourceType);
       setSelectedTable(config.data_source);
       
       form.setFieldsValue({
         page_key: config.page_key,
         title: config.title,
         data_source: config.data_source,
-        source_type: config.source_type || 'TABLE',
+        source_type: sourceType,
         source_params: config.source_params || [],
         columns: config.columns || [],
         searchable_fields: config.searchable_fields || [],
@@ -123,19 +143,22 @@ export default function PageConfigManagement() {
     }
   };
 
-  // Handle table selection - auto-populate columns
+  // Handle table selection - auto-populate columns or parameters
   const handleTableChange = (tableName) => {
     setSelectedTable(tableName);
+    const currentSourceType = form.getFieldValue('source_type') || 'TABLE';
     form.setFieldsValue({ 
       data_source: tableName,
-      // Clear columns when data source changes so they can be repopulated
-      columns: []
+      // Clear columns/params when data source changes so they can be repopulated
+      columns: [],
+      source_params: []
     });
-    // Columns will be auto-populate via useEffect when tableColumns changes
+    // Columns/parameters will be auto-populated via useEffect when data is loaded
   };
 
   // Handle source type change - clear data source selection
   const handleSourceTypeChange = (sourceType) => {
+    setCurrentSourceType(sourceType);
     form.setFieldsValue({ 
       source_type: sourceType,
       data_source: undefined,
@@ -144,9 +167,9 @@ export default function PageConfigManagement() {
     setSelectedTable(null);
   };
 
-  // Auto-populate columns when table columns are loaded
+  // Auto-populate columns when table/view columns are loaded
   useEffect(() => {
-    if (tableColumns.length > 0 && selectedTable) {
+    if (tableColumns.length > 0 && selectedTable && (currentSourceType === 'TABLE' || currentSourceType === 'VIEW')) {
       const currentColumns = form.getFieldValue('columns') || [];
       const currentDataSource = form.getFieldValue('data_source');
       
@@ -165,7 +188,30 @@ export default function PageConfigManagement() {
         form.setFieldsValue({ columns: mappedColumns });
       }
     }
-  }, [tableColumns, selectedTable, editingPage, form]);
+  }, [tableColumns, selectedTable, editingPage, form, currentSourceType]);
+
+  // Auto-populate procedure parameters when procedure parameters are loaded
+  useEffect(() => {
+    if (procedureParameters.length > 0 && selectedTable && currentSourceType === 'PROCEDURE') {
+      const currentParams = form.getFieldValue('source_params') || [];
+      const currentDataSource = form.getFieldValue('data_source');
+      
+      // Only auto-populate if:
+      // 1. Parameters are empty
+      // 2. AND (not editing OR data source has changed)
+      const shouldPopulate = currentParams.length === 0 &&
+                             (!editingPage || currentDataSource === selectedTable);
+      
+      if (shouldPopulate) {
+        const mappedParams = procedureParameters.map(param => ({
+          name: param.name,
+          type: param.type || 'string',
+          default_value: param.default_value || '',
+        }));
+        form.setFieldsValue({ source_params: mappedParams });
+      }
+    }
+  }, [procedureParameters, selectedTable, editingPage, form, currentSourceType]);
 
   const handleDelete = async (pageKey) => {
     try {
@@ -475,7 +521,7 @@ export default function PageConfigManagement() {
                               <Col span={10}>
                                 <Form.Item
                                   {...restField}
-                                  name={[name, 'value']}
+                                  name={[name, 'default_value']}
                                   label="Default Value"
                                 >
                                   <Input placeholder="Optional default value" />
@@ -486,7 +532,7 @@ export default function PageConfigManagement() {
                         ))}
                         <Button
                           type="dashed"
-                          onClick={() => add({ name: '', type: 'string', value: '' })}
+                          onClick={() => add({ name: '', type: 'string', default_value: '' })}
                           block
                           icon={<PlusOutlined />}
                           style={{ marginBottom: token.marginMD }}
@@ -501,10 +547,17 @@ export default function PageConfigManagement() {
               return null;
             }}
           </Form.Item>
-          {selectedTable && columnsLoading && (
+          {selectedTable && columnsLoading && (currentSourceType === 'TABLE' || currentSourceType === 'VIEW') && (
             <Spin size="small" style={{ marginTop: token.marginXS }}>
               <Text type="secondary" style={{ marginLeft: token.marginSM }}>
                 Loading columns...
+              </Text>
+            </Spin>
+          )}
+          {selectedTable && procedureParamsLoading && currentSourceType === 'PROCEDURE' && (
+            <Spin size="small" style={{ marginTop: token.marginXS }}>
+              <Text type="secondary" style={{ marginLeft: token.marginSM }}>
+                Loading procedure parameters...
               </Text>
             </Spin>
           )}

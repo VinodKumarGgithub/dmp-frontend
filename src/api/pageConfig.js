@@ -113,3 +113,19 @@ export function useTableIndexes(tableName, options = {}) {
   });
 }
 
+/**
+ * Get parameters from a specific stored procedure
+ */
+export function useProcedureParameters(procedureName, options = {}) {
+  return useQuery({
+    queryKey: ['db', 'procedures', procedureName, 'parameters'],
+    queryFn: async () => {
+      if (!procedureName) return [];
+      const res = await axiosInstance.get(`/pages/db/procedures/${procedureName}/parameters`);
+      return res.data?.data || res.data || [];
+    },
+    enabled: !!procedureName && (options.enabled !== false),
+    ...options,
+  });
+}
+
