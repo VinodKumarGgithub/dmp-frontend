@@ -56,6 +56,7 @@ export default function PageConfigManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPage, setEditingPage] = useState(null);
   const [form] = Form.useForm();
+  const isDownloadAllowed = Form.useWatch('is_download_allowed', form);
   const [activeTab, setActiveTab] = useState('basic');
   const [selectedTable, setSelectedTable] = useState(null);
 
@@ -102,6 +103,7 @@ export default function PageConfigManagement() {
       form.setFieldsValue({
         page_size_default: 20,
         is_download_allowed: false,
+        download_row_limit: null,
         source_type: 'TABLE',
         source_params: [],
         columns: [{ name: '', label: '', type: 'string' }],
@@ -136,6 +138,7 @@ export default function PageConfigManagement() {
         default_sort_order: config.default_sort?.order || 'ASC',
         is_download_allowed: config.is_download_allowed,
         page_size_default: config.page_size_default,
+        download_row_limit: config.download_row_limit ?? null,
       });
       setIsModalOpen(true);
     } catch (error) {
@@ -246,6 +249,12 @@ export default function PageConfigManagement() {
       const source_params = form.getFieldValue('source_params') || [];
       const validSourceParams = source_params.filter(p => p.name);
 
+      const isDownloadEnabled = values.is_download_allowed || false;
+      const resolvedDownloadLimit =
+        typeof values.download_row_limit === 'number' && Number.isFinite(values.download_row_limit)
+          ? values.download_row_limit
+          : null;
+
       const submitData = {
         page_key: values.page_key,
         title: values.title,
@@ -256,7 +265,8 @@ export default function PageConfigManagement() {
         searchable_fields: searchable_fields,
         filterable_fields: validFilters,
         default_sort: default_sort,
-        is_download_allowed: values.is_download_allowed || false,
+        is_download_allowed: isDownloadEnabled,
+        download_row_limit: isDownloadEnabled ? resolvedDownloadLimit : null,
         page_size_default: values.page_size_default || 20,
       };
 
@@ -563,7 +573,7 @@ export default function PageConfigManagement() {
           )}
 
           <Row gutter={16}>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 name="page_size_default"
                 label="Default Page Size"
@@ -572,13 +582,28 @@ export default function PageConfigManagement() {
                 <InputNumber min={1} max={100} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={12}>
+            <Col span={8}>
               <Form.Item
                 name="is_download_allowed"
                 label="Allow CSV Download"
                 valuePropName="checked"
               >
                 <Switch />
+              </Form.Item>
+            </Col>
+            <Col span={8}>
+              <Form.Item
+                name="download_row_limit"
+                label="Max Download Rows"
+                tooltip="Leave blank for unlimited downloads"
+              >
+                <InputNumber
+                  min={1}
+                  max={1000000}
+                  style={{ width: '100%' }}
+                  placeholder="Unlimited"
+                  disabled={!isDownloadAllowed}
+                />
               </Form.Item>
             </Col>
           </Row>
@@ -1071,6 +1096,7 @@ export default function PageConfigManagement() {
           initialValues={{
             page_size_default: 20,
             is_download_allowed: false,
+            download_row_limit: null,
             columns: [{ name: '', label: '', type: 'string' }],
             searchable_fields: [],
             filterable_fields: [],
