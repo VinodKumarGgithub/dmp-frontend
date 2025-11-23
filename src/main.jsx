@@ -8,16 +8,28 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import 'antd/dist/reset.css';
 
-// Configure React Query with error handling
+// Configure React Query with enhanced caching and performance
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: (failureCount, error) => {
+        // Don't retry on 4xx errors (client errors)
+        if (error?.response?.status >= 400 && error?.response?.status < 500) {
+          return false;
+        }
+        // Retry up to 2 times for network/server errors
+        return failureCount < 2;
+      },
       refetchOnWindowFocus: false,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      refetchOnReconnect: true,
+      staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes - cache persists for 10 minutes (formerly cacheTime)
+      // Use structural sharing to prevent unnecessary re-renders
+      structuralSharing: true,
     },
     mutations: {
       retry: 0,
+      // Optimistic updates can be added per mutation
     },
   },
 });

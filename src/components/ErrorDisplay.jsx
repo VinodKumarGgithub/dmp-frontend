@@ -67,6 +67,7 @@ export default function ErrorDisplay({ error, config }) {
   const executionTime = queryContext?.executionTime;
   const lineNumber = queryContext?.lineNumber;
   const column = queryContext?.column;
+  const hints = queryContext?.hints || [];
   const availableColumns = config?.columns || [];
 
   // Get column suggestions for column not found errors
@@ -121,7 +122,12 @@ export default function ErrorDisplay({ error, config }) {
   };
 
   return (
-    <Card style={{ marginBottom: 16 }}>
+    <Card 
+      style={{ marginBottom: 16 }}
+      role="alert"
+      aria-live="polite"
+      aria-atomic="true"
+    >
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Alert
           message={
@@ -135,18 +141,16 @@ export default function ErrorDisplay({ error, config }) {
             <div>
               <Paragraph style={{ marginBottom: 8 }}>{errorMessage}</Paragraph>
               {lineNumber && (
-                <Text type="secondary">Error at line {lineNumber}</Text>
-              )}
-              {executionTime !== null && executionTime !== undefined && (
-                <div style={{ marginTop: 4 }}>
-                  <Text type="secondary">Execution time: {executionTime}ms</Text>
-                </div>
+                <Text type="secondary" aria-label={`Error at line ${lineNumber}`}>
+                  Error at line {lineNumber}
+                </Text>
               )}
             </div>
           }
           type="error"
           showIcon
           style={{ width: '100%' }}
+          role="alert"
         />
 
         {errorDetails && (
@@ -185,6 +189,8 @@ export default function ErrorDisplay({ error, config }) {
                 icon={showQuery ? <EyeInvisibleOutlined /> : <EyeOutlined />}
                 onClick={() => setShowQuery(!showQuery)}
                 size="small"
+                aria-label={showQuery ? 'Hide SQL query' : 'Show SQL query'}
+                aria-expanded={showQuery}
               >
                 {showQuery ? 'Hide' : 'Show'} Query
               </Button>
@@ -193,6 +199,7 @@ export default function ErrorDisplay({ error, config }) {
                 icon={<CopyOutlined />}
                 onClick={() => copyToClipboard(sanitizedSql)}
                 size="small"
+                aria-label="Copy SQL query to clipboard"
               >
                 Copy Query
               </Button>
@@ -227,6 +234,19 @@ export default function ErrorDisplay({ error, config }) {
                 </Panel>
               </Collapse>
             )}
+          </div>
+        )}
+
+        {hints.length > 0 && (
+          <div>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>Helpful Tips:</Text>
+            <ul style={{ margin: 0, paddingLeft: 20 }}>
+              {hints.map((hint, idx) => (
+                <li key={idx} style={{ marginBottom: 4 }}>
+                  <Text type="secondary" style={{ fontSize: '13px' }}>{hint}</Text>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 

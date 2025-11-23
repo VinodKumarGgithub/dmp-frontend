@@ -95,6 +95,15 @@ function DataPage() {
   const [form] = Form.useForm();
   const [columnSettings, setColumnSettings] = useState([]);
   const [columnModalOpen, setColumnModalOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Stable default objects to avoid creating new ones on each render
   const defaultFilters = useMemo(() => ({}), []);
@@ -329,53 +338,6 @@ function DataPage() {
 
   const savingPreferences =
     (savePreferencesMutation.isPending ?? savePreferencesMutation.isLoading) ?? false;
-  const performance = pageData?.performance;
-  const performanceMeta = useMemo(() => {
-    if (!performance || typeof performance.queryExecutionTimeMs !== 'number') {
-      return null;
-    }
-    const ms = Math.round(performance.queryExecutionTimeMs);
-    const WARNING_MS = 2000;
-    const DANGER_MS = 4000;
-    let status = 'success';
-    let label = 'Fast';
-    if (ms >= DANGER_MS) {
-      status = 'error';
-      label = 'Slow';
-    } else if (ms >= WARNING_MS) {
-      status = 'warning';
-      label = 'Moderate';
-    }
-    return {
-      status,
-      label,
-      ms,
-      rowCount: typeof performance.rowCount === 'number' ? performance.rowCount : null,
-      showAlert: status !== 'success'
-    };
-  }, [performance]);
-  const performanceTag = useMemo(() => {
-    if (!performanceMeta) return null;
-    const colorMap = {
-      success: 'green',
-      warning: 'orange',
-      error: 'red',
-    };
-    return (
-      <Space size="small">
-        <Tooltip title="Server-side query execution time">
-          <Tag color={colorMap[performanceMeta.status] || 'blue'}>
-            {`${performanceMeta.label}: ${performanceMeta.ms} ms`}
-          </Tag>
-        </Tooltip>
-        {typeof performanceMeta.rowCount === 'number' && (
-          <Typography.Text type="secondary">
-            Rows: {performanceMeta.rowCount}
-          </Typography.Text>
-        )}
-      </Space>
-    );
-  }, [performanceMeta]);
   
   // Initialize pagination with config's page_size_default when config loads
   useEffect(() => {
@@ -602,13 +564,19 @@ function DataPage() {
   }
 
   return (
-    <div style={{ padding: token.paddingLG }}>
+    <div 
+      style={{ 
+        padding: token.paddingLG,
+        maxWidth: '100%',
+        overflowX: 'auto'
+      }}
+    >
       <Breadcrumb
         style={{ marginBottom: token.marginMD }}
         items={[
           {
             title: (
-              <Link to="/">
+              <Link to="/" aria-label="Navigate to home page">
                 <HomeOutlined /> Home
               </Link>
             ),
@@ -622,24 +590,40 @@ function DataPage() {
             ),
           },
         ]}
+        aria-label="Breadcrumb navigation"
       />
       <Card>
         <div
           style={{
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: isMobile ? 'flex-start' : 'center',
             marginBottom: token.marginLG,
+            gap: token.marginMD,
           }}
         >
-          <Title level={2} style={{ margin: 0 }}>
+          <Title 
+            level={2} 
+            style={{ margin: 0 }}
+            id="page-title"
+            aria-label={`Page: ${config.title || pageKey}`}
+          >
             <FileTextOutlined /> {config.title || pageKey}
           </Title>
-          <Space>
+          <Space 
+            wrap
+            style={{ 
+              width: isMobile ? '100%' : 'auto',
+              justifyContent: isMobile ? 'flex-start' : 'flex-end'
+            }}
+          >
             <Button
               icon={<SettingOutlined />}
               onClick={() => setColumnModalOpen(true)}
               disabled={!Array.isArray(config?.columns) || config.columns.length === 0}
+              aria-label="Configure column preferences"
+              aria-haspopup="dialog"
             >
               Columns
             </Button>
@@ -650,11 +634,16 @@ function DataPage() {
                 onClick={handleDownload}
                 disabled={isError || downloading}
                 loading={downloading}
+                aria-label={downloading ? 'Downloading data' : 'Download data as CSV'}
               >
                 {downloading ? 'Downloading...' : 'Download CSV'}
               </Button>
             )}
-            <Button icon={<ReloadOutlined />} onClick={() => refetch()}>
+            <Button 
+              icon={<ReloadOutlined />} 
+              onClick={() => refetch()}
+              aria-label="Refresh page data"
+            >
               Refresh
             </Button>
           </Space>
@@ -671,8 +660,28 @@ function DataPage() {
               value={searchText}
               onChange={(e) => handleSearch(e.target.value)}
               onSearch={handleSearch}
-              style={{ maxWidth: 400 }}
+              style={{ maxWidth: isMobile ? '100%' : 400 }}
+              aria-label="Search data"
+              aria-describedby="search-help"
             />
+            <div id="search-help" style={{ fontSize: '12px', color: token.colorTextSecondary, marginTop: 4 }}>
+              <Space size="small" wrap>
+                <span>Search in:</span>
+                {config.searchable_fields.map((field, idx) => {
+                  const fieldName = typeof field === 'string' ? field : (field.name || field);
+                  const fieldLabel = typeof field === 'object' && field.label ? field.label : fieldName;
+                  // Try to get label from config.columns if available
+                  const columnConfig = config.columns?.find(col => col.name === fieldName);
+                  const displayLabel = columnConfig?.label || fieldLabel || fieldName;
+                  
+                  return (
+                    <Tag key={idx} color="blue" style={{ margin: 0 }}>
+                      {displayLabel}
+                    </Tag>
+                  );
+                })}
+              </Space>
+            </div>
           </div>
         )}
 
@@ -681,14 +690,20 @@ function DataPage() {
           <Card
             size="small"
             style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
+            aria-label="Filter options"
           >
             <Form form={form} layout="inline">
               <Row gutter={[16, 16]} align="bottom" style={{ width: '100%' }}>
                 {config.filterable_fields.map((field) => (
                   <Col key={field.name} xs={24} sm={12} md={8} lg={6}>
-                    <Form.Item label={field.label} style={{ marginBottom: 0 }}>
+                    <Form.Item 
+                      label={field.label} 
+                      style={{ marginBottom: 0 }}
+                      htmlFor={`filter-${field.name}`}
+                    >
                       {field.type === 'select' ? (
                         <Select
+                          id={`filter-${field.name}`}
                           placeholder={`Select ${field.label}`}
                           allowClear
                           style={{ width: '100%' }}
@@ -698,9 +713,11 @@ function DataPage() {
                               ? field.options.map((opt) => ({ label: opt, value: opt }))
                               : []
                           }
+                          aria-label={`Filter by ${field.label}`}
                         />
                       ) : field.type === 'date' ? (
                         <RangePicker
+                          id={`filter-${field.name}`}
                           style={{ width: '100%' }}
                           onChange={(dates) => {
                             if (dates && dates[0] && dates[1]) {
@@ -711,44 +728,33 @@ function DataPage() {
                               handleFilterChange(`${field.name}_to`, null, true);
                             }
                           }}
+                          aria-label={`Filter ${field.label} by date range`}
                         />
                       ) : (
                         <Input
+                          id={`filter-${field.name}`}
                           placeholder={`Filter by ${field.label}`}
                           allowClear
                           onChange={(e) => handleFilterChange(field.name, e.target.value, false)}
+                          aria-label={`Filter by ${field.label}`}
                         />
                       )}
                     </Form.Item>
                   </Col>
                 ))}
-                <Col>
+                <Col xs={24} sm={12} md={8} lg={6}>
                   <Form.Item style={{ marginBottom: 0 }}>
-                    <Button onClick={handleReset}>Reset Filters</Button>
+                    <Button 
+                      onClick={handleReset}
+                      aria-label="Reset all filters"
+                    >
+                      Reset Filters
+                    </Button>
                   </Form.Item>
                 </Col>
               </Row>
             </Form>
           </Card>
-        )}
-
-        {performanceTag && (
-          <div style={{ marginBottom: token.marginSM }}>
-            {performanceTag}
-            {performanceMeta?.showAlert && (
-              <Alert
-                type={performanceMeta.status === 'error' ? 'error' : 'warning'}
-                showIcon
-                message={
-                  performanceMeta.status === 'error'
-                    ? 'Slow query detected'
-                    : 'Query running slower than usual'
-                }
-                description={`This query took ${performanceMeta.ms} ms to complete. Consider refining filters or optimizing the underlying SQL.`}
-                style={{ marginTop: token.marginXS }}
-              />
-            )}
-          </div>
         )}
 
         {/* Data Table Component */}

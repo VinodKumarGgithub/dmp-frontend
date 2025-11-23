@@ -93,6 +93,12 @@ export function usePage(pageKey, queryParams = {}) {
     placeholderData: (previousData) => previousData,
     // Don't refetch on window focus to prevent unwanted reloads
     refetchOnWindowFocus: false,
+    // Cache config separately from data for better performance
+    staleTime: (query) => {
+      // Config changes less frequently, cache longer
+      const isConfigOnly = !queryParams.page && !queryParams.pageSize && !queryParams.search && !queryParams.sortBy;
+      return isConfigOnly ? 10 * 60 * 1000 : 2 * 60 * 1000; // 10 min for config, 2 min for data
+    },
   });
 }
 
