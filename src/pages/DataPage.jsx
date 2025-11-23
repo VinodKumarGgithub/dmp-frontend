@@ -9,6 +9,9 @@ import {
   Select,
   DatePicker,
   Spin,
+  Tag,
+  Alert,
+  Tooltip,
   theme as antdTheme,
   Row,
   Col,
@@ -36,7 +39,7 @@ import { useDebounce } from '../hooks/useDebounce';
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
 
-export default function DataPage() {
+function DataPage() {
   const { pageKey } = useParams();
   const { token } = antdTheme.useToken();
   const selectedTenant = useAuthStore((state) => state.selectedTenant);
@@ -143,6 +146,53 @@ export default function DataPage() {
   const tableData = Array.isArray(pageData?.data) ? pageData.data : [];
   const backendTotal = pageData?.total ?? 0;
   const hasMore = config?.source_type === 'PROCEDURE' ? Boolean(pageData?.hasMore) : false;
+  const performance = pageData?.performance;
+  const performanceMeta = useMemo(() => {
+    if (!performance || typeof performance.queryExecutionTimeMs !== 'number') {
+      return null;
+    }
+    const ms = Math.round(performance.queryExecutionTimeMs);
+    const WARNING_MS = 2000;
+    const DANGER_MS = 4000;
+    let status = 'success';
+    let label = 'Fast';
+    if (ms >= DANGER_MS) {
+      status = 'error';
+      label = 'Slow';
+    } else if (ms >= WARNING_MS) {
+      status = 'warning';
+      label = 'Moderate';
+    }
+    return {
+      status,
+      label,
+      ms,
+      rowCount: typeof performance.rowCount === 'number' ? performance.rowCount : null,
+      showAlert: status !== 'success'
+    };
+  }, [performance]);
+  const performanceTag = useMemo(() => {
+    if (!performanceMeta) return null;
+    const colorMap = {
+      success: 'green',
+      warning: 'orange',
+      error: 'red',
+    };
+    return (
+      <Space size="small">
+        <Tooltip title="Server-side query execution time">
+          <Tag color={colorMap[performanceMeta.status] || 'blue'}>
+            {`${performanceMeta.label}: ${performanceMeta.ms} ms`}
+          </Tag>
+        </Tooltip>
+        {typeof performanceMeta.rowCount === 'number' && (
+          <Typography.Text type="secondary">
+            Rows: {performanceMeta.rowCount}
+          </Typography.Text>
+        )}
+      </Space>
+    );
+  }, [performanceMeta]);
   
   // Initialize pagination with config's page_size_default when config loads
   useEffect(() => {
@@ -492,6 +542,25 @@ export default function DataPage() {
           </Card>
         )}
 
+        {performanceTag && (
+          <div style={{ marginBottom: token.marginSM }}>
+            {performanceTag}
+            {performanceMeta?.showAlert && (
+              <Alert
+                type={performanceMeta.status === 'error' ? 'error' : 'warning'}
+                showIcon
+                message={
+                  performanceMeta.status === 'error'
+                    ? 'Slow query detected'
+                    : 'Query running slower than usual'
+                }
+                description={`This query took ${performanceMeta.ms} ms to complete. Consider refining filters or optimizing the underlying SQL.`}
+                style={{ marginTop: token.marginXS }}
+              />
+            )}
+          </div>
+        )}
+
         {/* Data Table Component */}
         <DataTable
           config={config}
@@ -598,4 +667,6 @@ export default function DataPage() {
     </div>
   );
 }
+
+export default DataPage;
 
