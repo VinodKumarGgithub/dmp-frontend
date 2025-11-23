@@ -30,6 +30,7 @@ import { showSuccess, showError } from '../utils/errorHandler';
 import useAuthStore from '../stores/authStore';
 import useDataPageStore from '../stores/dataPageStore';
 import DataTable from '../components/DataTable';
+import ErrorDisplay from '../components/ErrorDisplay';
 import { useDebounce } from '../hooks/useDebounce';
 
 const { Title } = Typography;
@@ -294,14 +295,10 @@ export default function DataPage() {
             },
           ]}
         />
-        <Card>
-          <Title level={4}>Error Loading Page</Title>
-          <p>{error?.message || error?.code || 'Failed to load page configuration'}</p>
-          {error?.details && <p style={{ color: token.colorTextSecondary }}>{JSON.stringify(error.details)}</p>}
-          <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ marginTop: token.marginMD }}>
-            Retry
-          </Button>
-        </Card>
+        <ErrorDisplay error={error} config={config} />
+        <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ marginTop: token.marginMD }}>
+          Retry
+        </Button>
       </div>
     );
   }
@@ -506,6 +503,7 @@ export default function DataPage() {
           onTableChange={handleTableChange}
           onMoreClick={handleMoreClick}
           token={token}
+          hasMore={hasMore}
         />
       </Card>
 

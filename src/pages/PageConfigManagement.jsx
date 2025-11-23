@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Card,
   Table,
@@ -37,10 +37,11 @@ import {
   HomeOutlined,
 } from '@ant-design/icons';
 import { usePages } from '../api/pages';
-import { useCreatePageConfig, useUpdatePageConfig, useDeletePageConfig, useTables, useTableColumns, useTableIndexes, useProcedureParameters } from '../api/pageConfig';
+import { useCreatePageConfig, useUpdatePageConfig, useDeletePageConfig, useTables, useTableColumns, useTableIndexes, useProcedureParameters, testQuery, detectColumns } from '../api/pageConfig';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
+import usePageConfigColumnsStore from '../stores/pageConfigColumnsStore';
 
 const normalizeSourceParams = (params = []) => {
   if (!Array.isArray(params)) {
@@ -81,6 +82,190 @@ export default function PageConfigManagement() {
   const isDownloadAllowed = Form.useWatch('is_download_allowed', form);
   const [activeTab, setActiveTab] = useState('basic');
   const [selectedTable, setSelectedTable] = useState(null);
+  const [detectingColumns, setDetectingColumns] = useState(false);
+  const [testingQuery, setTestingQuery] = useState(false);
+  const [queryTestResult, setQueryTestResult] = useState(null);
+  const autoDetectRef = useRef('');
+  const watchedSourceParams = Form.useWatch('source_params', form);
+  const watchedColumns = Form.useWatch('columns', form);
+  const watchedSourceType = Form.useWatch('source_type', form);
+  const availableColumns = usePageConfigColumnsStore((state) => state.availableColumns);
+  const setAvailableColumns = usePageConfigColumnsStore((state) => state.setAvailableColumns);
+  const resetAvailableColumns = usePageConfigColumnsStore((state) => state.resetAvailableColumns);
+  const formatLabelFromName = (name = '') => {
+    if (!name) return '';
+    return name
+      .replace(/_/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+  const deriveColumnOptions = (cols = []) =>
+    (cols || [])
+      .filter((col) => col && col.name)
+      .map((col) => ({
+        name: col.name,
+        label: col.label || formatLabelFromName(col.name),
+        type: col.type || 'string'
+      }));
+
+  const handleColumnNameSelect = (fieldIndex, columnName) => {
+    const currentColumns = form.getFieldValue('columns') || [];
+    const updatedColumns = [...currentColumns];
+    const selectedOption = availableColumns.find((col) => col.name === columnName);
+    const nextValue = {
+      ...(updatedColumns[fieldIndex] || {}),
+      name: columnName
+    };
+    if (!nextValue.label) {
+      nextValue.label = selectedOption?.label || formatLabelFromName(columnName);
+    }
+    if (!nextValue.type) {
+      nextValue.type = selectedOption?.type || 'string';
+    }
+    updatedColumns[fieldIndex] = nextValue;
+    form.setFieldsValue({ columns: updatedColumns });
+  };
+
+  const handleFilterFieldSelect = (listName, fieldIndex, columnName) => {
+    const currentValues = form.getFieldValue(listName) || [];
+    const updatedValues = [...currentValues];
+    const selectedOption = availableColumns.find((col) => col.name === columnName);
+    const nextValue = {
+      ...(updatedValues[fieldIndex] || {}),
+      name: columnName
+    };
+    if (!nextValue.label) {
+      nextValue.label = selectedOption?.label || formatLabelFromName(columnName);
+    }
+    updatedValues[fieldIndex] = nextValue;
+    form.setFieldsValue({ [listName]: updatedValues });
+  };
+
+  const handleDetectProcedureColumns = async (options = {}) => {
+    const { silent = false } = options;
+    const sourceType = form.getFieldValue('source_type');
+    if (sourceType !== 'PROCEDURE') {
+      message.warning('Column detection is only available for procedures');
+      return;
+    }
+
+    const sourceParams = form.getFieldValue('source_params') || [];
+    const pSqlParam = sourceParams.find((param) => param?.name === 'p_sql');
+    const pSqlValue = pSqlParam?.value;
+
+    if (!pSqlValue || !pSqlValue.trim()) {
+      message.warning('Add a p_sql parameter with your SQL query before detecting columns');
+      return;
+    }
+
+    const pageKeyValue = form.getFieldValue('page_key') || editingPage?.page_key || 'detect';
+    setDetectingColumns(true);
+
+    try {
+      const result = await detectColumns(pageKeyValue, pSqlValue);
+      const detectedColumns = result?.columns || result || [];
+
+      if (!Array.isArray(detectedColumns) || detectedColumns.length === 0) {
+        message.warning('No columns were detected. Make sure your SQL returns at least one row.');
+        return;
+      }
+
+      const formattedColumns = detectedColumns.map((col) => ({
+        name: col.name,
+        label: formatLabelFromName(col.name),
+        type: col.type || 'string'
+      }));
+
+      const detectedNames = formattedColumns.map((col) => col.name);
+      const currentSearchable = form.getFieldValue('searchable_fields') || [];
+      const currentFilterable = form.getFieldValue('filterable_fields') || [];
+
+      form.setFieldsValue({
+        columns: formattedColumns,
+        searchable_fields: currentSearchable.filter((field) => detectedNames.includes(field)),
+        filterable_fields: currentFilterable.filter((field) => field?.name && detectedNames.includes(field.name))
+      });
+      setAvailableColumns(deriveColumnOptions(formattedColumns));
+
+      if (!silent) {
+        message.success(`Detected ${formattedColumns.length} column${formattedColumns.length === 1 ? '' : 's'}`);
+      }
+    } catch (error) {
+      // Error already handled via handleApiError
+    } finally {
+      setDetectingColumns(false);
+    }
+  };
+
+  const handleTestProcedureQuery = async () => {
+    const sourceType = form.getFieldValue('source_type');
+    if (sourceType !== 'PROCEDURE') {
+      message.warning('Test query is only available for procedures');
+      return;
+    }
+
+    const sourceParams = form.getFieldValue('source_params') || [];
+    const pSqlParam = sourceParams.find((param) => param?.name === 'p_sql');
+    const pSqlValue = pSqlParam?.value;
+
+    if (!pSqlValue || !pSqlValue.trim()) {
+      message.warning('Add a p_sql parameter with your SQL query before testing');
+      return;
+    }
+
+    const pageKeyValue = form.getFieldValue('page_key') || editingPage?.page_key || 'test';
+    setTestingQuery(true);
+    setQueryTestResult(null);
+
+    try {
+      const result = await testQuery(pageKeyValue, pSqlValue, {});
+      setQueryTestResult(result);
+
+      if (result?.valid) {
+        message.success(`Query validated. Rows returned: ${result.rowCount ?? 0}`);
+      } else {
+        message.error(result?.error?.message || 'Query validation failed');
+      }
+    } catch (error) {
+      // handleApiError already displays a message
+    } finally {
+      setTestingQuery(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!isModalOpen) {
+      autoDetectRef.current = '';
+      setQueryTestResult(null);
+      resetAvailableColumns();
+    }
+  }, [isModalOpen, resetAvailableColumns]);
+
+  useEffect(() => {
+    if (!isModalOpen || activeTab !== 'columns' || watchedSourceType !== 'PROCEDURE') {
+      return;
+    }
+
+    const pSqlParam = (watchedSourceParams || []).find((param) => (param?.name || '').toLowerCase() === 'p_sql');
+    const pSqlValue = pSqlParam?.value;
+    if (!pSqlValue || !pSqlValue.trim()) {
+      return;
+    }
+
+    const hasColumns = Array.isArray(watchedColumns) && watchedColumns.some((col) => col && col.name);
+    if (hasColumns || detectingColumns) {
+      return;
+    }
+
+    const signature = `${pSqlValue.trim()}::${editingPage?.page_key || 'new'}`;
+    if (autoDetectRef.current === signature) {
+      return;
+    }
+
+    autoDetectRef.current = signature;
+    handleDetectProcedureColumns({ silent: true });
+  }, [activeTab, watchedSourceParams, watchedColumns, watchedSourceType, detectingColumns, isModalOpen, editingPage]);
 
   const pages = pagesData?.data || (Array.isArray(pagesData) ? pagesData : []);
 
@@ -121,6 +306,7 @@ export default function PageConfigManagement() {
     setActiveTab('basic');
     setSelectedTable(null);
     setCurrentSourceType('TABLE');
+    resetAvailableColumns();
     form.resetFields();
       form.setFieldsValue({
         page_size_default: 20,
@@ -162,6 +348,7 @@ export default function PageConfigManagement() {
         page_size_default: config.page_size_default,
         download_row_limit: config.download_row_limit ?? null,
       });
+      setAvailableColumns(deriveColumnOptions(config.columns || []));
       setIsModalOpen(true);
     } catch (error) {
       message.error('Failed to load page config');
@@ -179,6 +366,7 @@ export default function PageConfigManagement() {
       source_params: []
     });
     // Columns/parameters will be auto-populated via useEffect when data is loaded
+    resetAvailableColumns();
   };
 
   // Handle source type change - clear data source selection
@@ -190,30 +378,38 @@ export default function PageConfigManagement() {
       source_params: []
     });
     setSelectedTable(null);
+    resetAvailableColumns();
   };
 
   // Auto-populate columns when table/view columns are loaded
-  useEffect(() => {
-    if (tableColumns.length > 0 && selectedTable && (currentSourceType === 'TABLE' || currentSourceType === 'VIEW')) {
-      const currentColumns = form.getFieldValue('columns') || [];
-      const currentDataSource = form.getFieldValue('data_source');
-      
-      // Only auto-populate if:
-      // 1. Columns are empty or have only one empty entry
-      // 2. AND (not editing OR data source has changed)
-      const shouldPopulate = (currentColumns.length === 0 || (currentColumns.length === 1 && !currentColumns[0].name)) &&
-                             (!editingPage || currentDataSource === selectedTable);
-      
-      if (shouldPopulate) {
-        const mappedColumns = tableColumns.map(col => ({
-          name: col.name,
-          label: col.name.charAt(0).toUpperCase() + col.name.slice(1).replace(/_/g, ' '),
-          type: col.type,
-        }));
-        form.setFieldsValue({ columns: mappedColumns });
-      }
+useEffect(() => {
+  if (!(currentSourceType === 'TABLE' || currentSourceType === 'VIEW')) {
+    return;
+  }
+
+  if (!selectedTable) {
+      resetAvailableColumns();
+    return;
+  }
+
+  if (tableColumns.length > 0) {
+    const normalizedColumns = tableColumns.map(col => ({
+      name: col.name,
+      label: formatLabelFromName(col.name),
+      type: col.type,
+    }));
+    setAvailableColumns(deriveColumnOptions(normalizedColumns));
+
+    const currentColumns = form.getFieldValue('columns') || [];
+    const currentDataSource = form.getFieldValue('data_source');
+    const shouldPopulate = (currentColumns.length === 0 || (currentColumns.length === 1 && !currentColumns[0].name)) &&
+                           (!editingPage || currentDataSource === selectedTable);
+
+    if (shouldPopulate) {
+      form.setFieldsValue({ columns: normalizedColumns });
     }
-  }, [tableColumns, selectedTable, editingPage, form, currentSourceType]);
+  }
+}, [tableColumns, selectedTable, editingPage, form, currentSourceType]);
 
   // Auto-populate procedure parameters when procedure parameters are loaded
   useEffect(() => {
@@ -515,58 +711,115 @@ export default function PageConfigManagement() {
                             </Tooltip>
                           </Space>
                         </Divider>
-                        {fields.map(({ key, name, ...restField }) => (
-                          <Card
-                            key={key}
-                            size="small"
-                            style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
-                            extra={
-                              <Button
-                                type="text"
-                                danger
-                                icon={<DeleteFilled />}
-                                onClick={() => remove(name)}
-                              />
-                            }
-                          >
-                            <Row gutter={16}>
-                              <Col span={8}>
-                                <Form.Item
-                                  {...restField}
-                                  name={[name, 'name']}
-                                  label="Parameter Name"
-                                  rules={[{ required: true, message: 'Required' }]}
-                                >
-                                  <Input placeholder="e.g., start_date" />
-                                </Form.Item>
-                              </Col>
-                              <Col span={6}>
-                                <Form.Item
-                                  {...restField}
-                                  name={[name, 'type']}
-                                  label="Type"
-                                  initialValue="string"
-                                >
-                                  <Select>
-                                    <Option value="string">String</Option>
-                                    <Option value="number">Number</Option>
-                                    <Option value="boolean">Boolean</Option>
-                                    <Option value="date">Date</Option>
-                                  </Select>
-                                </Form.Item>
-                              </Col>
-                              <Col span={10}>
-                                <Form.Item
-                                  {...restField}
-                                  name={[name, 'value']}
-                                  label="Default Value"
-                                >
-                                  <Input placeholder="Optional default value" />
-                                </Form.Item>
-                              </Col>
-                            </Row>
-                          </Card>
-                        ))}
+                        {fields.map(({ key, name, ...restField }) => {
+                          const paramName = form.getFieldValue(['source_params', name, 'name']);
+                          const isPSql = (paramName || '').toLowerCase() === 'p_sql';
+                          const pSqlValue = isPSql ? form.getFieldValue(['source_params', name, 'value']) : null;
+
+                          return (
+                            <Card
+                              key={key}
+                              size="small"
+                              style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
+                              extra={
+                                <Button
+                                  type="text"
+                                  danger
+                                  icon={<DeleteFilled />}
+                                  onClick={() => remove(name)}
+                                />
+                              }
+                            >
+                              <Row gutter={16}>
+                                <Col span={8}>
+                                  <Form.Item
+                                    {...restField}
+                                    name={[name, 'name']}
+                                    label="Parameter Name"
+                                    rules={[{ required: true, message: 'Required' }]}
+                                  >
+                                    <Input placeholder="e.g., p_sql or start_date" disabled={isPSql} />
+                                  </Form.Item>
+                                </Col>
+                                <Col span={6}>
+                                  <Form.Item
+                                    {...restField}
+                                    name={[name, 'type']}
+                                    label="Type"
+                                    initialValue="string"
+                                  >
+                                    <Select disabled={isPSql}>
+                                      <Option value="string">String</Option>
+                                      <Option value="number">Number</Option>
+                                      <Option value="boolean">Boolean</Option>
+                                      <Option value="date">Date</Option>
+                                    </Select>
+                                  </Form.Item>
+                                </Col>
+                                <Col span={10}>
+                                  <Form.Item
+                                    {...restField}
+                                    name={[name, 'value']}
+                                    label={isPSql ? 'SQL Query (p_sql)' : 'Default Value'}
+                                    rules={isPSql ? [{ required: true, message: 'SQL query is required' }] : []}
+                                  >
+                                    {isPSql ? (
+                                      <Input.TextArea
+                                        rows={6}
+                                        placeholder="SELECT * FROM your_table WHERE ..."
+                                        style={{ fontFamily: 'monospace' }}
+                                        onChange={() => setQueryTestResult(null)}
+                                      />
+                                    ) : (
+                                      <Input placeholder="Optional default value" />
+                                    )}
+                                  </Form.Item>
+                                </Col>
+                              </Row>
+                              {isPSql && (
+                                <>
+                                  <Space style={{ marginTop: token.marginXS }}>
+                                    <Button
+                                      type="primary"
+                                      icon={<CheckCircleOutlined />}
+                                      loading={testingQuery}
+                                      onClick={handleTestProcedureQuery}
+                                    >
+                                      Test Query
+                                    </Button>
+                                    <Button
+                                      loading={detectingColumns}
+                                      onClick={() => handleDetectProcedureColumns()}
+                                      disabled={!pSqlValue}
+                                    >
+                                      Detect Columns
+                                    </Button>
+                                  </Space>
+                                  {queryTestResult && (
+                                    <Alert
+                                      style={{ marginTop: token.marginXS }}
+                                      type={queryTestResult.valid ? 'success' : 'error'}
+                                      showIcon
+                                      message={
+                                        queryTestResult.valid ? 'Query validated successfully' : 'Query validation failed'
+                                      }
+                                      description={
+                                        queryTestResult.valid ? (
+                                          <span>
+                                            Execution time: {queryTestResult.executionTime ?? '—'}ms · Rows returned:{' '}
+                                            {queryTestResult.rowCount ?? 0}
+                                          </span>
+                                        ) : (
+                                          queryTestResult.error?.message || 'See server logs for more details.'
+                                        )
+                                      }
+                                    />
+                                  )}
+                                </>
+                              )}
+                            </Card>
+                          );
+                        })}
                         <Button
                           type="dashed"
                           onClick={() => add({ name: '', type: 'string', value: '' })}
@@ -641,9 +894,47 @@ export default function PageConfigManagement() {
       key: 'columns',
       label: 'Columns',
       children: (
-        <Form.List name="columns">
-          {(fields, { add, remove }) => (
-            <>
+        <>
+          <Form.Item
+            noStyle
+            shouldUpdate={(prevValues, currentValues) =>
+              prevValues.source_type !== currentValues.source_type ||
+              JSON.stringify(prevValues.source_params) !== JSON.stringify(currentValues.source_params)
+            }
+          >
+            {({ getFieldValue }) => {
+              const sourceType = getFieldValue('source_type');
+              const sourceParams = getFieldValue('source_params') || [];
+              const hasPSql = sourceParams.some((param) => param?.name === 'p_sql' && param?.value);
+
+              if (sourceType !== 'PROCEDURE') {
+                return null;
+              }
+
+              return (
+                <Alert
+                  type="info"
+                  showIcon
+                  style={{ marginBottom: token.marginMD }}
+                  message="Auto-detect columns from procedure SQL"
+                  description="Runs your procedure SQL with a limited preview to capture column names and data types."
+                  action={
+                    <Button
+                      type="primary"
+                      loading={detectingColumns}
+                      disabled={!hasPSql}
+                      onClick={handleDetectProcedureColumns}
+                    >
+                      Detect Columns
+                    </Button>
+                  }
+                />
+              );
+            }}
+          </Form.Item>
+          <Form.List name="columns">
+            {(fields, { add, remove }) => (
+              <>
               {fields.map(({ key, name, ...restField }) => (
                 <Card
                   key={key}
@@ -664,9 +955,28 @@ export default function PageConfigManagement() {
                         {...restField}
                         name={[name, 'name']}
                         label="Column Name"
-                        rules={[{ required: true, message: 'Required' }]}
+                        rules={[{ required: true, message: 'Column selection is required' }]}
                       >
-                        <Input placeholder="e.g., id" />
+                        <Select
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder={availableColumns.length ? 'Select column' : 'Run column detection'}
+                          disabled={availableColumns.length === 0}
+                          onChange={(value) => handleColumnNameSelect(name, value)}
+                        >
+                          {availableColumns.map((col) => (
+                            <Option key={col.name} value={col.name} label={col.label || col.name}>
+                              <Space>
+                                <span>{col.label || col.name}</span>
+                                {col.label && col.label !== col.name && (
+                                  <Text type="secondary" style={{ marginLeft: token.marginXXS }}>
+                                    ({col.name})
+                                  </Text>
+                                )}
+                              </Space>
+                            </Option>
+                          ))}
+                        </Select>
                       </Form.Item>
                     </Col>
                     <Col span={8}>
@@ -715,6 +1025,7 @@ export default function PageConfigManagement() {
             </>
           )}
         </Form.List>
+        </>
       ),
     },
     {
@@ -886,7 +1197,26 @@ export default function PageConfigManagement() {
                                   }
                                   rules={[{ required: true, message: 'Required' }]}
                                 >
-                                  <Input placeholder="e.g., status" />
+                                  <Select
+                                    showSearch
+                                    optionFilterProp="label"
+                                    placeholder={availableColumns.length ? 'Select column' : 'Detect columns first'}
+                                    disabled={availableColumns.length === 0}
+                                    onChange={(value) => handleFilterFieldSelect('filterable_fields', name, value)}
+                                  >
+                                    {availableColumns.map((col) => (
+                                      <Option key={`${col.name}-${key}`} value={col.name} label={col.label || col.name}>
+                                        <Space>
+                                          <span>{col.label || col.name}</span>
+                                          {col.label && col.label !== col.name && (
+                                            <Text type="secondary" style={{ marginLeft: token.marginXXS }}>
+                                              ({col.name})
+                                            </Text>
+                                          )}
+                                        </Space>
+                                      </Option>
+                                    ))}
+                                  </Select>
                                 </Form.Item>
                               </Col>
                         <Col span={8}>
@@ -896,7 +1226,7 @@ export default function PageConfigManagement() {
                             label="Filter Label"
                             rules={[{ required: true, message: 'Required' }]}
                           >
-                            <Input placeholder="e.g., Status" />
+                                  <Input placeholder="e.g., Status" />
                           </Form.Item>
                         </Col>
                         <Col span={8}>

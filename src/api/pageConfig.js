@@ -129,3 +129,35 @@ export function useProcedureParameters(procedureName, options = {}) {
   });
 }
 
+/**
+ * Detect columns for a given p_sql query
+ */
+export async function detectColumns(pageKey, pSql) {
+  try {
+    const targetKey = pageKey || 'detect';
+    const res = await axiosInstance.post(`/pages/${targetKey}/detect-columns`, {
+      p_sql: pSql
+    });
+    return res.data?.data || res.data;
+  } catch (error) {
+    handleApiError(error);
+    throw error;
+  }
+}
+
+/**
+ * Test a p_sql query (for validation and preview)
+ */
+export async function testQuery(pageKey, pSql, queryParams = {}) {
+  try {
+    const res = await axiosInstance.post(`/pages/${pageKey}/test-query`, {
+      p_sql: pSql,
+      queryParams
+    });
+    return res.data?.data || res.data;
+  } catch (error) {
+    handleApiError(error);
+    throw error;
+  }
+}
+

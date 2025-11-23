@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { Table, Card, Skeleton, Typography, theme as antdTheme } from 'antd';
-import { FileTextOutlined, MoreOutlined } from '@ant-design/icons';
+import { Table, Card, Skeleton, Typography, Tooltip } from 'antd';
+import { FileTextOutlined, MoreOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import { Button } from 'antd';
 
 const { Title } = Typography;
@@ -15,6 +15,7 @@ export default function DataTable({
   onTableChange,
   onMoreClick,
   token,
+  hasMore = false,
 }) {
   // Build table columns from config or data
   const tableColumns = useMemo(() => {
@@ -216,7 +217,22 @@ export default function DataTable({
         pageSize: pagination.pageSize,
         total: total,
         showSizeChanger: true,
-        showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`,
+        showTotal: (tot, range) => {
+          const isProcedure = config?.source_type === 'PROCEDURE';
+          const baseText = `Showing ${range[0]}-${range[1]} of `;
+          if (!isProcedure) {
+            return `${baseText}${tot} items`;
+          }
+          return (
+            <span>
+              {baseText}
+              {hasMore ? 'many+' : `${tot} items`}
+              <Tooltip title="Stored procedures return streaming results, so we estimate totals using hasMore pagination.">
+                <InfoCircleOutlined style={{ marginLeft: 6, color: token.colorTextSecondary }} />
+              </Tooltip>
+            </span>
+          );
+        },
         pageSizeOptions: (() => {
           // Include config's default page size in options if not already present
           const defaultOptions = ['10', '20', '50', '100'];
