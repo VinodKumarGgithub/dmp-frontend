@@ -140,7 +140,8 @@ export default function DataPage() {
   // So pageData should be { config, data, total }
   const config = pageData?.config;
   const tableData = Array.isArray(pageData?.data) ? pageData.data : [];
-  const total = pageData?.total || 0;
+  const backendTotal = pageData?.total ?? 0;
+  const hasMore = config?.source_type === 'PROCEDURE' ? Boolean(pageData?.hasMore) : false;
   
   // Initialize pagination with config's page_size_default when config loads
   useEffect(() => {
@@ -160,6 +161,15 @@ export default function DataPage() {
   const defaultPageSize = config?.page_size_default || pageState?.pagination?.pageSize || 20;
   const defaultPagination = useMemo(() => ({ current: 1, pageSize: defaultPageSize }), [defaultPageSize]);
   const pagination = pageState?.pagination ?? defaultPagination;
+  const effectiveTotal = useMemo(() => {
+    if (config?.source_type === 'PROCEDURE') {
+      const current = pagination.current || 1;
+      const pageSize = pagination.pageSize || defaultPageSize;
+      const base = (current - 1) * pageSize + tableData.length;
+      return hasMore ? base + 1 : base;
+    }
+    return backendTotal;
+  }, [config?.source_type, pagination.current, pagination.pageSize, defaultPageSize, tableData.length, hasMore, backendTotal]);
 
   const handleSearch = (value) => {
     setSearchText(pageKey, value);
@@ -489,7 +499,7 @@ export default function DataPage() {
         <DataTable
           config={config}
           data={tableData}
-          total={total}
+          total={effectiveTotal}
           loading={isFetching && !!config}
           pagination={pagination}
           sorting={sorting}

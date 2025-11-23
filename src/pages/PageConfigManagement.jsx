@@ -42,6 +42,28 @@ import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 
+const normalizeSourceParams = (params = []) => {
+  if (!Array.isArray(params)) {
+    return [];
+  }
+  return params
+    .filter(Boolean)
+    .map((param) => {
+      const hasValue = param && Object.prototype.hasOwnProperty.call(param, 'value');
+      const resolvedValue = hasValue
+        ? param.value
+        : Object.prototype.hasOwnProperty.call(param || {}, 'default_value')
+          ? param.default_value
+          : '';
+
+      return {
+        name: param?.name || '',
+        type: param?.type || 'string',
+        value: resolvedValue ?? '',
+      };
+    });
+};
+
 const { Title, Text } = Typography;
 const { Option } = Select;
 
@@ -130,7 +152,7 @@ export default function PageConfigManagement() {
         title: config.title,
         data_source: config.data_source,
         source_type: sourceType,
-        source_params: config.source_params || [],
+        source_params: normalizeSourceParams(config.source_params),
         columns: config.columns || [],
         searchable_fields: config.searchable_fields || [],
         filterable_fields: config.filterable_fields || [],
@@ -206,11 +228,7 @@ export default function PageConfigManagement() {
                              (!editingPage || currentDataSource === selectedTable);
       
       if (shouldPopulate) {
-        const mappedParams = procedureParameters.map(param => ({
-          name: param.name,
-          type: param.type || 'string',
-          default_value: param.default_value || '',
-        }));
+        const mappedParams = normalizeSourceParams(procedureParameters);
         form.setFieldsValue({ source_params: mappedParams });
       }
     }
@@ -247,7 +265,16 @@ export default function PageConfigManagement() {
 
       // Get source parameters
       const source_params = form.getFieldValue('source_params') || [];
-      const validSourceParams = source_params.filter(p => p.name);
+      const validSourceParams = (source_params || [])
+        .filter(param => param && param.name)
+        .map(param => {
+          const hasValue = Object.prototype.hasOwnProperty.call(param, 'value');
+          return {
+            name: param.name,
+            type: param.type || 'string',
+            value: hasValue ? param.value : '',
+          };
+        });
 
       const isDownloadEnabled = values.is_download_allowed || false;
       const resolvedDownloadLimit =
@@ -531,7 +558,7 @@ export default function PageConfigManagement() {
                               <Col span={10}>
                                 <Form.Item
                                   {...restField}
-                                  name={[name, 'default_value']}
+                                  name={[name, 'value']}
                                   label="Default Value"
                                 >
                                   <Input placeholder="Optional default value" />
@@ -542,7 +569,7 @@ export default function PageConfigManagement() {
                         ))}
                         <Button
                           type="dashed"
-                          onClick={() => add({ name: '', type: 'string', default_value: '' })}
+                          onClick={() => add({ name: '', type: 'string', value: '' })}
                           block
                           icon={<PlusOutlined />}
                           style={{ marginBottom: token.marginMD }}
