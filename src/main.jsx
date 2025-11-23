@@ -2,11 +2,18 @@ import React from 'react';
 import App from './App.jsx';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { App as AntdApp, ConfigProvider } from 'antd';
+import { App as AntdApp, ConfigProvider, message } from 'antd';
 import enUS from 'antd/locale/en_US';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import 'antd/dist/reset.css';
+
+// Configure Ant Design message to show only one toast at a time
+message.config({
+  maxCount: 1,
+  duration: 4,
+  top: 24,
+});
 
 // Configure React Query with enhanced caching and performance
 const queryClient = new QueryClient({

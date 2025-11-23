@@ -49,8 +49,17 @@ axiosInstance.interceptors.response.use(
     const errorCode = errorResponse.error?.code || errorResponse.code || 'INTERNAL_ERROR';
     const errorDetails = errorResponse.error?.details || errorResponse.details;
 
-    // Show toast notification for errors
-    message.error(errorMessage, 4);
+    // Check if error should skip toast (set in request config)
+    const skipToast = error.config?.skipToast || false;
+    
+    // Only show toast if not explicitly skipped (components will handle their own toasts)
+    // Skip toast for auth errors as they're handled by handleApiError
+    const isAuthError = error.config?.url?.includes('/auth/');
+    
+    if (!skipToast && !isAuthError) {
+      // Ant Design message.config({ maxCount: 1 }) will handle showing only one toast at a time
+      message.error(errorMessage, 4);
+    }
 
     // Log error for debugging
     console.error('API Error:', {

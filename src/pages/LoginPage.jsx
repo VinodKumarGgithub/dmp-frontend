@@ -160,14 +160,14 @@ export default function LoginPage() {
                     borderRadius: 16,
                     background: isDark 
                       ? glassBgLight 
-                      : `linear-gradient(135deg, ${glassBgLight}, ${glassBg})`,
+                      : `linear-gradient(135deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.05))`,
                     backdropFilter: 'blur(10px)',
                     border: `1px solid ${isDark ? glassBorderLight : token.colorBorder}`,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     marginBottom: token.marginMD,
-                    boxShadow: isDark ? 'none' : '0 4px 12px rgba(0, 0, 0, 0.05)',
+                    boxShadow: isDark ? 'none' : '0 4px 12px rgba(0, 0, 0, 0.06)',
                     position: 'relative',
                     overflow: 'hidden',
                   }}
@@ -231,12 +231,12 @@ export default function LoginPage() {
                         borderRadius: 12,
                         background: isDark 
                           ? glassBgLight 
-                          : `linear-gradient(135deg, ${glassBgLight}, ${glassBg})`,
+                          : `linear-gradient(135deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.05))`,
                         border: `1px solid ${isDark ? glassBorderLight : token.colorBorder}`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: isDark ? 'none' : '0 2px 8px rgba(0, 0, 0, 0.04)',
+                        boxShadow: isDark ? 'none' : '0 2px 8px rgba(0, 0, 0, 0.06)',
                         position: 'relative',
                         overflow: 'hidden',
                       }}
@@ -277,12 +277,12 @@ export default function LoginPage() {
                         borderRadius: 12,
                         background: isDark 
                           ? glassBgLight 
-                          : `linear-gradient(135deg, ${glassBgLight}, ${glassBg})`,
+                          : `linear-gradient(135deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.05))`,
                         border: `1px solid ${isDark ? glassBorderLight : token.colorBorder}`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: isDark ? 'none' : '0 2px 8px rgba(0, 0, 0, 0.04)',
+                        boxShadow: isDark ? 'none' : '0 2px 8px rgba(0, 0, 0, 0.06)',
                         position: 'relative',
                         overflow: 'hidden',
                       }}
@@ -323,12 +323,12 @@ export default function LoginPage() {
                         borderRadius: 12,
                         background: isDark 
                           ? glassBgLight 
-                          : `linear-gradient(135deg, ${glassBgLight}, ${glassBg})`,
+                          : `linear-gradient(135deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.05))`,
                         border: `1px solid ${isDark ? glassBorderLight : token.colorBorder}`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        boxShadow: isDark ? 'none' : '0 2px 8px rgba(0, 0, 0, 0.04)',
+                        boxShadow: isDark ? 'none' : '0 2px 8px rgba(0, 0, 0, 0.06)',
                         position: 'relative',
                         overflow: 'hidden',
                       }}
@@ -375,7 +375,7 @@ export default function LoginPage() {
                     borderRadius: '50%',
                     background: isDark 
                       ? glassBgLight 
-                      : `linear-gradient(135deg, ${glassBgLight}, ${glassBg})`,
+                      : `linear-gradient(135deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.05))`,
                     backdropFilter: 'blur(10px)',
                     border: `1px solid ${isDark ? glassBorderLight : token.colorBorder}`,
                     display: 'flex',
@@ -383,7 +383,7 @@ export default function LoginPage() {
                     justifyContent: 'center',
                     margin: '0 auto',
                     marginBottom: token.marginMD,
-                    boxShadow: isDark ? 'none' : '0 4px 12px rgba(0, 0, 0, 0.08)',
+                    boxShadow: isDark ? 'none' : '0 4px 12px rgba(0, 0, 0, 0.06)',
                     position: 'relative',
                     overflow: 'hidden',
                   }}
@@ -611,20 +611,33 @@ export default function LoginPage() {
           background: linear-gradient(
             45deg,
             transparent 0%,
-            transparent 35%,
-            ${isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 255, 255, 0.9)'} 50%,
-            transparent 65%,
+            transparent 15%,
+            ${isDark 
+              ? 'rgba(255, 255, 255, 0.7)' 
+              : 'rgba(255, 255, 255, 0.85)'} 40%,
+            ${isDark 
+              ? 'rgba(255, 255, 255, 1)' 
+              : 'rgba(255, 255, 255, 1)'} 50%,
+            ${isDark 
+              ? 'rgba(255, 255, 255, 0.7)' 
+              : 'rgba(255, 255, 255, 0.85)'} 60%,
+            transparent 85%,
             transparent 100%
           );
-          animation: blazing-shine 2.5s ease-in-out infinite;
+          animation: blazing-shine 5s ease-in-out infinite;
           pointer-events: none;
+          z-index: 2;
+          mix-blend-mode: ${isDark ? 'normal' : 'hard-light'};
+          opacity: ${isDark ? 1 : 1};
+          box-shadow: ${isDark ? 'none' : 'inset 0 0 20px rgba(255, 255, 255, 0.5)'};
         }
 
         .icon-blazing-shine {
           position: relative;
           display: inline-block;
-          filter: drop-shadow(0 0 4px ${isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.2)'});
+          filter: drop-shadow(0 0 4px ${isDark ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.15)'});
           transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          z-index: 3;
         }
 
         .icon-blazing:hover .icon-blazing-shine {
@@ -633,7 +646,7 @@ export default function LoginPage() {
         }
 
         .icon-blazing:hover::before {
-          animation-duration: 1.5s;
+          animation-duration: 3s;
         }
 
         /* Enhanced hover effects for blazing icons */
