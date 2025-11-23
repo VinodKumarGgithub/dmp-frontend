@@ -12,6 +12,8 @@ import {
   Tag,
   Alert,
   Tooltip,
+  Modal,
+  Checkbox,
   theme as antdTheme,
   Row,
   Col,
@@ -25,10 +27,14 @@ import {
   ReloadOutlined,
   FileTextOutlined,
   HomeOutlined,
+  SettingOutlined,
+  ArrowUpOutlined,
+  ArrowDownOutlined,
 } from '@ant-design/icons';
 import { useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { usePage, downloadPageData } from '../api/pages';
+import { usePagePreferences, useSavePagePreferences } from '../api/pagePreferences';
 import { showSuccess, showError } from '../utils/errorHandler';
 import useAuthStore from '../stores/authStore';
 import useDataPageStore from '../stores/dataPageStore';
@@ -39,11 +45,56 @@ import { useDebounce } from '../hooks/useDebounce';
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
 
+const toTitle = (text = '') => {
+  if (!text) return '';
+  return text
+    .replace(/_/g, ' ')
+    .replace(/\./g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
+
+const buildColumnSettings = (baseColumns = [], preferences = []) => {
+  if (!Array.isArray(baseColumns) || baseColumns.length === 0) {
+    return [];
+  }
+
+  const baseMap = new Map(
+    baseColumns.map((col) => [col.name, { name: col.name, label: col.label || toTitle(col.name) }])
+  );
+
+  const normalizedPrefs = (Array.isArray(preferences) ? preferences : [])
+    .map((pref) => {
+      if (!pref) return null;
+      const name = pref.name || pref.column || pref;
+      if (!name || !baseMap.has(name)) return null;
+      return {
+        name,
+        visible: pref.visible !== false,
+        label: baseMap.get(name)?.label || toTitle(name),
+      };
+    })
+    .filter(Boolean);
+
+  const remaining = [];
+  baseMap.forEach((value, key) => {
+    if (!normalizedPrefs.some((pref) => pref.name === key)) {
+      remaining.push({ name: key, visible: true, label: value.label });
+    }
+  });
+
+  return [...normalizedPrefs, ...remaining];
+};
+
 function DataPage() {
   const { pageKey } = useParams();
   const { token } = antdTheme.useToken();
   const selectedTenant = useAuthStore((state) => state.selectedTenant);
   const [form] = Form.useForm();
+  const [columnSettings, setColumnSettings] = useState([]);
+  const [columnModalOpen, setColumnModalOpen] = useState(false);
 
   // Stable default objects to avoid creating new ones on each render
   const defaultFilters = useMemo(() => ({}), []);
@@ -136,6 +187,8 @@ function DataPage() {
   // Use isFetching for table loading (shows loading on refetch)
   // Use isLoading only for initial config load check
   const { data: pageData, isLoading, isFetching, isError, error, refetch } = usePage(pageKey, queryParams);
+  const { data: pagePreferences } = usePagePreferences(pageKey, { enabled: Boolean(pageKey) });
+  const savePreferencesMutation = useSavePagePreferences(pageKey);
 
   // Handle response format from axios interceptor:
   // Backend returns: { success: true, message: "...", data: { config, data, total } }
@@ -146,6 +199,136 @@ function DataPage() {
   const tableData = Array.isArray(pageData?.data) ? pageData.data : [];
   const backendTotal = pageData?.total ?? 0;
   const hasMore = config?.source_type === 'PROCEDURE' ? Boolean(pageData?.hasMore) : false;
+
+  const baseColumns = useMemo(() => {
+    if (!Array.isArray(config?.columns)) return [];
+    return config.columns.map((col) => ({
+      ...col,
+      label: col.label || toTitle(col.name),
+    }));
+  }, [config?.columns]);
+
+  const fallbackPreferences = useMemo(() => {
+    if (!baseColumns.length) return [];
+    return baseColumns.map((col) => ({ name: col.name, visible: true }));
+  }, [baseColumns]);
+
+  const applySavedPreferences = useCallback(() => {
+    if (!baseColumns.length) {
+      setColumnSettings([]);
+      return;
+    }
+    const prefs =
+      Array.isArray(pagePreferences?.tableColumns) && pagePreferences.tableColumns.length > 0
+        ? pagePreferences.tableColumns
+        : fallbackPreferences;
+    setColumnSettings(buildColumnSettings(baseColumns, prefs));
+  }, [baseColumns, fallbackPreferences, pagePreferences?.tableColumns]);
+
+  useEffect(() => {
+    applySavedPreferences();
+  }, [applySavedPreferences]);
+
+  const visibleColumnNames = useMemo(
+    () => columnSettings.filter((col) => col.visible !== false).map((col) => col.name),
+    [columnSettings]
+  );
+
+  const displayColumns = useMemo(() => {
+    if (!config?.columns) return [];
+    if (columnSettings.length === 0) return config.columns;
+
+    const columnMap = new Map(config.columns.map((col) => [col.name, col]));
+    const ordered = [];
+    columnSettings.forEach((setting) => {
+      const column = columnMap.get(setting.name);
+      if (column && setting.visible !== false) {
+        ordered.push(column);
+      }
+    });
+    // Include any columns not present in settings (new columns)
+    config.columns.forEach((column) => {
+      if (!columnSettings.some((setting) => setting.name === column.name)) {
+        ordered.push(column);
+      }
+    });
+    return ordered;
+  }, [config?.columns, columnSettings]);
+
+  const displayConfig = useMemo(() => {
+    if (!config) return config;
+    return {
+      ...config,
+      columns: displayColumns,
+    };
+  }, [config, displayColumns]);
+
+  const tableConfig = displayConfig || config;
+
+  // Compute hidden columns (columns not visible in the table) for the "View More" drawer
+  const hiddenColumns = useMemo(() => {
+    if (!config?.columns || !Array.isArray(config.columns)) return [];
+    if (columnSettings.length === 0) return []; // If no preferences, all columns are visible
+    
+    const visibleSet = new Set(visibleColumnNames);
+    return config.columns.filter((col) => !visibleSet.has(col.name));
+  }, [config?.columns, visibleColumnNames, columnSettings]);
+
+  const handleColumnModalClose = useCallback(() => {
+    setColumnModalOpen(false);
+  }, []);
+
+  const handleRevertToSaved = useCallback(() => {
+    applySavedPreferences();
+  }, [applySavedPreferences]);
+
+  const handleColumnVisibilityChange = (name, checked) => {
+    setColumnSettings((prev) =>
+      prev.map((col) => (col.name === name ? { ...col, visible: checked } : col))
+    );
+  };
+
+  const handleColumnMove = (name, direction) => {
+    setColumnSettings((prev) => {
+      const index = prev.findIndex((col) => col.name === name);
+      if (index === -1) return prev;
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= prev.length) {
+        return prev;
+      }
+      const updated = [...prev];
+      const [moved] = updated.splice(index, 1);
+      updated.splice(newIndex, 0, moved);
+      return updated;
+    });
+  };
+
+  const handleResetColumnSettings = () => {
+    if (!baseColumns.length) {
+      setColumnSettings([]);
+      return;
+    }
+    setColumnSettings(buildColumnSettings(baseColumns, fallbackPreferences));
+  };
+
+  const handleSaveColumnSettings = () => {
+    if (!baseColumns.length) {
+      setColumnModalOpen(false);
+      return;
+    }
+    const payload = {
+      tableColumns: columnSettings.map((col) => ({ name: col.name, visible: col.visible !== false })),
+      downloadColumns: columnSettings.map((col) => ({ name: col.name, visible: col.visible !== false })),
+    };
+    savePreferencesMutation.mutate(payload, {
+      onSuccess: () => {
+        setColumnModalOpen(false);
+      },
+    });
+  };
+
+  const savingPreferences =
+    (savePreferencesMutation.isPending ?? savePreferencesMutation.isLoading) ?? false;
   const performance = pageData?.performance;
   const performanceMeta = useMemo(() => {
     if (!performance || typeof performance.queryExecutionTimeMs !== 'number') {
@@ -285,7 +468,7 @@ function DataPage() {
 
     setDownloading(pageKey, true);
     try {
-      await downloadPageData(pageKey, queryParams);
+      await downloadPageData(pageKey, queryParams, visibleColumnNames);
       showSuccess('Download completed successfully');
     } catch (error) {
       // Error already handled by downloadPageData
@@ -453,6 +636,13 @@ function DataPage() {
             <FileTextOutlined /> {config.title || pageKey}
           </Title>
           <Space>
+            <Button
+              icon={<SettingOutlined />}
+              onClick={() => setColumnModalOpen(true)}
+              disabled={!Array.isArray(config?.columns) || config.columns.length === 0}
+            >
+              Columns
+            </Button>
             {config.is_download_allowed && (
               <Button
                 type="primary"
@@ -563,7 +753,7 @@ function DataPage() {
 
         {/* Data Table Component */}
         <DataTable
-          config={config}
+          config={tableConfig}
           data={tableData}
           total={effectiveTotal}
           loading={isFetching && !!config}
@@ -573,8 +763,81 @@ function DataPage() {
           onMoreClick={handleMoreClick}
           token={token}
           hasMore={hasMore}
+          hasHiddenColumns={hiddenColumns.length > 0}
         />
       </Card>
+
+      <Modal
+        title="Column Preferences"
+        open={columnModalOpen}
+        onCancel={handleColumnModalClose}
+        destroyOnClose={false}
+        footer={[
+          <Button key="revert" onClick={handleRevertToSaved} disabled={!columnSettings.length}>
+            Revert to saved
+          </Button>,
+          <Button key="reset" onClick={handleResetColumnSettings} disabled={!columnSettings.length}>
+            Reset to defaults
+          </Button>,
+          <Button key="close" onClick={handleColumnModalClose}>
+            Close
+          </Button>,
+          <Button
+            key="save"
+            type="primary"
+            onClick={handleSaveColumnSettings}
+            loading={savingPreferences}
+            disabled={!columnSettings.length}
+          >
+            Save
+          </Button>,
+        ]}
+      >
+        {columnSettings.length === 0 ? (
+          <Typography.Text type="secondary">No columns available for this page.</Typography.Text>
+        ) : (
+          columnSettings.map((col, index) => (
+            <div
+              key={col.name}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '8px 0',
+                borderBottom:
+                  index !== columnSettings.length - 1 ? `1px solid ${token.colorSplit}` : 'none',
+              }}
+            >
+              <Checkbox
+                checked={col.visible !== false}
+                onChange={(e) => handleColumnVisibilityChange(col.name, e.target.checked)}
+              >
+                {col.label || toTitle(col.name)}
+              </Checkbox>
+              <Space>
+                <Button
+                  size="small"
+                  icon={<ArrowUpOutlined />}
+                  onClick={() => handleColumnMove(col.name, -1)}
+                  disabled={index === 0}
+                />
+                <Button
+                  size="small"
+                  icon={<ArrowDownOutlined />}
+                  onClick={() => handleColumnMove(col.name, 1)}
+                  disabled={index === columnSettings.length - 1}
+                />
+              </Space>
+            </div>
+          ))
+        )}
+        {columnSettings.length > 0 && (
+          <Typography.Paragraph type="secondary" style={{ marginTop: token.marginSM }}>
+            Select which columns appear in the table and their order. Downloads use the same
+            selection.
+          </Typography.Paragraph>
+        )}
+      </Modal>
 
       {/* Drawer for showing additional columns */}
       <Drawer
@@ -602,64 +865,75 @@ function DataPage() {
             }}
           >
             {(() => {
-              // If columns are specified in config, use them (beyond first 5)
-              if (config?.columns && Array.isArray(config.columns) && config.columns.length > 5) {
-                return config.columns.slice(5).map((col) => {
-              const value = selectedRecord[col.name];
-              let displayValue = '-';
-              if (value !== null && value !== undefined) {
-                if (col.type === 'date' && value) {
-                  displayValue = new Date(value).toLocaleDateString();
-                } else {
-                  displayValue = String(value);
-                }
-              }
-              return (
-                <Descriptions.Item key={col.name} label={col.label || col.name}>
-                  <div
-                    style={{
-                      wordBreak: 'break-word',
-                      color: token.colorText,
-                    }}
-                  >
-                    {displayValue}
-                  </div>
-                </Descriptions.Item>
-              );
-                });
-              }
-              
-              // If columns are not specified, show all fields beyond first 5
-              const allKeys = Object.keys(selectedRecord);
-              const hiddenKeys = allKeys.slice(5);
-              return hiddenKeys.map((key) => {
-                const value = selectedRecord[key];
-                let displayValue = '-';
-                if (value !== null && value !== undefined) {
-                  // Try to detect date format
-                  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-                    try {
+              // Show only hidden columns (columns not visible in the table)
+              if (hiddenColumns.length > 0) {
+                return hiddenColumns.map((col) => {
+                  const value = selectedRecord[col.name];
+                  let displayValue = '-';
+                  if (value !== null && value !== undefined) {
+                    if (col.type === 'date' && value) {
                       displayValue = new Date(value).toLocaleDateString();
-                    } catch {
+                    } else {
                       displayValue = String(value);
                     }
-                  } else {
-                    displayValue = String(value);
                   }
+                  return (
+                    <Descriptions.Item key={col.name} label={col.label || col.name}>
+                      <div
+                        style={{
+                          wordBreak: 'break-word',
+                          color: token.colorText,
+                        }}
+                      >
+                        {displayValue}
+                      </div>
+                    </Descriptions.Item>
+                  );
+                });
+              }
+
+              // Fallback: if no column config, show all fields not in visible columns
+              if (selectedRecord && typeof selectedRecord === 'object') {
+                const visibleSet = new Set(visibleColumnNames);
+                const hiddenFields = Object.entries(selectedRecord).filter(([key]) => !visibleSet.has(key));
+                
+                if (hiddenFields.length > 0) {
+                  return hiddenFields.map(([key, value]) => {
+                    let displayValue = '-';
+                    if (value !== null && value !== undefined) {
+                      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+                        try {
+                          displayValue = new Date(value).toLocaleDateString();
+                        } catch {
+                          displayValue = String(value);
+                        }
+                      } else {
+                        displayValue = String(value);
+                      }
+                    }
+                    return (
+                      <Descriptions.Item key={key} label={key.replace(/_/g, ' ').toUpperCase()}>
+                        <div
+                          style={{
+                            wordBreak: 'break-word',
+                            color: token.colorText,
+                          }}
+                        >
+                          {displayValue}
+                        </div>
+                      </Descriptions.Item>
+                    );
+                  });
                 }
-                return (
-                  <Descriptions.Item key={key} label={key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' ')}>
-                    <div
-                      style={{
-                        wordBreak: 'break-word',
-                        color: token.colorText,
-                      }}
-                    >
-                      {displayValue}
-                    </div>
-                  </Descriptions.Item>
-                );
-              });
+              }
+
+              return (
+                <Descriptions.Item key="no-data" label="No additional data">
+                  <Typography.Text type="secondary">
+                    All columns are currently visible in the table. Use the Columns button to hide some columns.
+                  </Typography.Text>
+                </Descriptions.Item>
+              );
             })()}
           </Descriptions>
         )}

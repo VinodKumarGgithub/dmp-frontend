@@ -99,7 +99,7 @@ export function usePage(pageKey, queryParams = {}) {
 /**
  * Convert JSON data to CSV format
  */
-function convertToCSV(data) {
+function convertToCSV(data, selectedColumns = []) {
   if (!Array.isArray(data) || data.length === 0) {
     return '';
   }
@@ -110,7 +110,7 @@ function convertToCSV(data) {
     return '';
   }
 
-  const cols = Object.keys(firstRow);
+  const cols = selectedColumns.length > 0 ? selectedColumns : Object.keys(firstRow);
   if (cols.length === 0) {
     return '';
   }
@@ -145,7 +145,7 @@ function convertToCSV(data) {
  * Download page data as CSV (streaming approach)
  * Backend sends JSON, frontend converts to CSV and downloads
  */
-export async function downloadPageData(pageKey, queryParams = {}) {
+export async function downloadPageData(pageKey, queryParams = {}, selectedColumns = []) {
   try {
     // Fetch JSON data from backend
     const response = await axiosInstance.get(`/pages/${pageKey}/download`, {
@@ -162,7 +162,7 @@ export async function downloadPageData(pageKey, queryParams = {}) {
     }
 
     // Convert JSON to CSV
-    const csv = convertToCSV(data);
+    const csv = convertToCSV(data, selectedColumns);
 
     // Create blob and download
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });

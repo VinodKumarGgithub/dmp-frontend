@@ -16,18 +16,13 @@ export default function DataTable({
   onMoreClick,
   token,
   hasMore = false,
+  hasHiddenColumns = false,
 }) {
   // Build table columns from config or data
   const tableColumns = useMemo(() => {
     // If columns are specified in config, use them
     if (config?.columns && Array.isArray(config.columns) && config.columns.length > 0) {
-      const allColumns = config.columns;
-      const maxVisibleColumns = 5;
-      const visibleColumns = allColumns.slice(0, maxVisibleColumns);
-      const hiddenColumns = allColumns.slice(maxVisibleColumns);
-
-      // Build visible columns
-      const columns = visibleColumns.map((col) => ({
+      const columns = config.columns.map((col) => ({
         title: col.label || col.name,
         dataIndex: col.name,
         key: col.name,
@@ -42,8 +37,8 @@ export default function DataTable({
         },
       }));
 
-      // Add "More" column if there are hidden columns
-      if (hiddenColumns.length > 0) {
+      // Only add "More" column if there are hidden columns
+      if (hasHiddenColumns) {
         columns.push({
           title: 'More',
           key: 'more',
@@ -124,7 +119,7 @@ export default function DataTable({
     }
 
     return [];
-  }, [config, data, token, onMoreClick]);
+  }, [config, data, token, onMoreClick, hasHiddenColumns]);
 
   // Generate unique row key from record data - MUST be before any early returns
   const getRowKey = useMemo(() => {
