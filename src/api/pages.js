@@ -104,8 +104,9 @@ export function usePage(pageKey, queryParams = {}) {
 
 /**
  * Convert JSON data to CSV format
+ * CSV uses labels from config (same as Excel) for user-friendly headers
  */
-function convertToCSV(data, selectedColumns = []) {
+function convertToCSV(data, selectedColumns = [], config = {}) {
   if (!Array.isArray(data) || data.length === 0) {
     return '';
   }
@@ -116,18 +117,21 @@ function convertToCSV(data, selectedColumns = []) {
     return '';
   }
 
+  // Get column keys (names/aliases)
   const cols = selectedColumns.length > 0 ? selectedColumns : Object.keys(firstRow);
   if (cols.length === 0) {
     return '';
   }
 
-  // Generate CSV header
-  const header = cols.map((col) => {
-    const escaped = String(col).replace(/"/g, '""');
+  // Generate CSV header using labels from config (same as Excel)
+  const header = cols.map((colName) => {
+    const columnConfig = config?.columns?.find(col => col.name === colName);
+    const headerLabel = columnConfig?.label || colName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const escaped = String(headerLabel).replace(/"/g, '""');
     return `"${escaped}"`;
   }).join(',');
 
-  // Generate CSV rows
+  // Generate CSV rows using column names as keys
   const rows = data.map((row) => {
     if (!row || typeof row !== 'object') {
       return cols.map(() => '""').join(',');
@@ -148,14 +152,109 @@ function convertToCSV(data, selectedColumns = []) {
 }
 
 /**
- * Download page data as CSV (streaming approach)
- * Backend sends JSON, frontend converts to CSV and downloads
+ * Convert JSON data to Excel format with formatting (headers, borders, fonts)
+ * Uses exceljs for professional Excel file generation
  */
-export async function downloadPageData(pageKey, queryParams = {}, selectedColumns = []) {
+function convertToExcel(data, selectedColumns = [], config = {}) {
+  // Dynamic import of exceljs for lightweight loading
+  return import('exceljs').then((ExcelJS) => {
+    // Create a new workbook and worksheet
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Data');
+
+    // Filter data to selected columns if provided
+    let filteredData = data;
+    if (selectedColumns.length > 0 && data.length > 0) {
+      filteredData = data.map(row => {
+        const filteredRow = {};
+        selectedColumns.forEach(colName => {
+          if (row.hasOwnProperty(colName)) {
+            filteredRow[colName] = row[colName];
+          }
+        });
+        return filteredRow;
+      });
+    }
+
+    // Get column definitions with labels from config
+    const columnDefs = [];
+    const keys = selectedColumns.length > 0 ? selectedColumns : (data.length > 0 ? Object.keys(data[0]) : []);
+    
+    keys.forEach(colName => {
+      const columnConfig = config?.columns?.find(col => col.name === colName);
+      const headerLabel = columnConfig?.label || colName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      
+      columnDefs.push({
+        header: headerLabel, // Use label for Excel header
+        key: colName, // Use column name as key for data access
+        width: 15
+      });
+    });
+
+    // Set column definitions
+    worksheet.columns = columnDefs;
+
+    // Add header row styling
+    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+    worksheet.getRow(1).fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: '176c07' } // Parrot green background
+    };
+    worksheet.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
+    worksheet.getRow(1).border = {
+      top: { style: 'thin', color: { argb: 'FF000000' } },
+      bottom: { style: 'thin', color: { argb: 'FF000000' } },
+      left: { style: 'thin', color: { argb: 'FF000000' } },
+      right: { style: 'thin', color: { argb: 'FF000000' } }
+    };
+    worksheet.getRow(1).height = 20;
+
+    // Add data rows
+    filteredData.forEach((row, rowIndex) => {
+      const excelRow = worksheet.addRow(row);
+      
+      // Style data rows (borders, left-aligned text)
+      excelRow.font = { size: 10 };
+      excelRow.alignment = { horizontal: 'left', vertical: 'middle' };
+      excelRow.border = {
+        top: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        left: { style: 'thin', color: { argb: 'FFCCCCCC' } },
+        right: { style: 'thin', color: { argb: 'FFCCCCCC' } }
+      };
+    });
+
+    // Auto-size columns based on content
+    worksheet.columns.forEach((column, index) => {
+      let maxLength = column.header.length;
+      filteredData.forEach(row => {
+        const key = keys[index];
+        const value = String(row[key] || '');
+        if (value.length > maxLength) {
+          maxLength = value.length;
+        }
+      });
+      column.width = Math.min(Math.max(maxLength + 2, 10), 50); // Min 10, max 50
+    });
+
+    // Freeze header row
+    worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    // Generate Excel file buffer
+    return workbook.xlsx.writeBuffer();
+  });
+}
+
+/**
+ * Download page data as CSV or Excel
+ * Backend sends JSON, frontend converts to selected format and downloads
+ */
+export async function downloadPageData(pageKey, queryParams = {}, selectedColumns = [], format = 'csv', config = {}) {
   try {
     // Fetch JSON data from backend
     const response = await axiosInstance.get(`/pages/${pageKey}/download`, {
-      params: queryParams,
+      params: { ...queryParams, format },
       responseType: 'json',
     });
 
@@ -167,19 +266,37 @@ export async function downloadPageData(pageKey, queryParams = {}, selectedColumn
       throw new Error('No data available to download');
     }
 
-    // Convert JSON to CSV
-    const csv = convertToCSV(data, selectedColumns);
+    if (format === 'excel') {
+      // Convert to Excel
+      const excelBuffer = await convertToExcel(data, selectedColumns, config);
+      
+      // Create blob and download
+      const blob = new Blob([excelBuffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${pageKey}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } else {
+      // Convert JSON to CSV (default)
+      const csv = convertToCSV(data, selectedColumns, config);
 
-    // Create blob and download
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${pageKey}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
+      // Create blob and download
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${pageKey}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    }
 
     return { success: true };
   } catch (error) {

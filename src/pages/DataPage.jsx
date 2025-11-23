@@ -96,6 +96,7 @@ function DataPage() {
   const [columnSettings, setColumnSettings] = useState([]);
   const [columnModalOpen, setColumnModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [exportFormat, setExportFormat] = useState('csv');
 
   useEffect(() => {
     const handleResize = () => {
@@ -430,8 +431,8 @@ function DataPage() {
 
     setDownloading(pageKey, true);
     try {
-      await downloadPageData(pageKey, queryParams, visibleColumnNames);
-      showSuccess('Download completed successfully');
+      await downloadPageData(pageKey, queryParams, visibleColumnNames, exportFormat, config);
+      showSuccess(`Download completed successfully (${exportFormat.toUpperCase()})`);
     } catch (error) {
       // Error already handled by downloadPageData
     } finally {
@@ -628,16 +629,29 @@ function DataPage() {
               Columns
             </Button>
             {config.is_download_allowed && (
-              <Button
-                type="primary"
-                icon={<DownloadOutlined />}
-                onClick={handleDownload}
-                disabled={isError || downloading}
-                loading={downloading}
-                aria-label={downloading ? 'Downloading data' : 'Download data as CSV'}
-              >
-                {downloading ? 'Downloading...' : 'Download CSV'}
-              </Button>
+              <Space.Compact>
+                <Select
+                  value={exportFormat}
+                  onChange={setExportFormat}
+                  disabled={downloading}
+                  style={{ width: 100 }}
+                  options={[
+                    { label: 'CSV', value: 'csv' },
+                    { label: 'Excel', value: 'excel' },
+                  ]}
+                  aria-label="Select export format"
+                />
+                <Button
+                  type="primary"
+                  icon={<DownloadOutlined />}
+                  onClick={handleDownload}
+                  disabled={isError || downloading}
+                  loading={downloading}
+                  aria-label={downloading ? 'Downloading data' : `Download data as ${exportFormat.toUpperCase()}`}
+                >
+                  {downloading ? 'Downloading...' : 'Download'}
+                </Button>
+              </Space.Compact>
             )}
             <Button 
               icon={<ReloadOutlined />} 
