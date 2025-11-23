@@ -24,6 +24,8 @@ import {
   HomeOutlined,
 } from '@ant-design/icons';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '../api/users';
+import { useTenants } from '../api/tenants';
+import { usePages } from '../api/pages';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 
@@ -40,12 +42,34 @@ export default function UserManagement() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
+  const roleWatch = Form.useWatch('role', form);
 
   const users = usersData?.data || (Array.isArray(usersData) ? usersData : []);
+  const { data: tenantsData, isLoading: tenantsLoading } = useTenants({}, { enabled: isModalOpen });
+  const tenantList = tenantsData?.data || (Array.isArray(tenantsData) ? tenantsData : []);
+  const tenantOptions = tenantList.map((tenant) => ({
+    label: tenant.name ? `${tenant.name} (${tenant.id})` : tenant.id,
+    value: tenant.id,
+  }));
+
+  const { data: pagesData, isLoading: pagesLoading } = usePages({ enabled: isModalOpen });
+  const pageList = pagesData?.data || (Array.isArray(pagesData) ? pagesData : []);
+  const pageOptions = pageList.map((page) => ({
+    label: page.title ? `${page.title} (${page.page_key})` : page.page_key,
+    value: page.page_key,
+  }));
+
+  const effectiveRole = roleWatch || editingUser?.role || 'USER';
+  const isTenantRequired = effectiveRole !== 'ADMIN' && effectiveRole !== 'MANAGER';
 
   const handleAdd = () => {
     setEditingUser(null);
     form.resetFields();
+    form.setFieldsValue({
+      role: 'USER',
+      tenantIds: [],
+      pageKeys: [],
+    });
     setIsModalOpen(true);
   };
 
@@ -54,6 +78,8 @@ export default function UserManagement() {
     form.setFieldsValue({
       username: user.username,
       role: user.role,
+      tenantIds: user.tenant_permissions || [],
+      pageKeys: user.page_permissions || [],
     });
     setIsModalOpen(true);
   };
@@ -69,30 +95,43 @@ export default function UserManagement() {
   const handleSubmit = async (values) => {
     try {
       if (editingUser) {
-        // Update user (password and/or role)
-        const updateData = {};
+        const hasPasswordChange = Boolean(values.password);
+        const hasRoleChange = values.role && values.role !== editingUser.role;
+        const hasTenantChange =
+          JSON.stringify(values.tenantIds || []) !== JSON.stringify(editingUser.tenant_permissions || []);
+        const hasPageChange =
+          JSON.stringify(values.pageKeys || []) !== JSON.stringify(editingUser.page_permissions || []);
+
+        if (!hasPasswordChange && !hasRoleChange && !hasTenantChange && !hasPageChange) {
+          message.warning('Please update password, role, or permissions before saving');
+          return;
+        }
+
+        const updateData = {
+          role: values.role || editingUser.role,
+          tenantIds: values.tenantIds || [],
+          pageKeys: values.pageKeys || [],
+        };
+
         if (values.password) {
           updateData.password = values.password;
         }
-        if (values.role) {
-          updateData.role = values.role;
-        }
-        
-        if (Object.keys(updateData).length === 0) {
-          message.warning('Please enter a new password or change role to update');
-          return;
-        }
-        
+
         await updateMutation.mutateAsync({
           id: editingUser.id,
           data: updateData,
         });
       } else {
-        // Create new user
+        if (values.role !== 'ADMIN' && values.role !== 'MANAGER' && (!values.tenantIds || values.tenantIds.length === 0)) {
+          message.warning('Please assign at least one tenant');
+          return;
+        }
         await createMutation.mutateAsync({
           username: values.username,
           password: values.password,
           role: values.role || 'USER',
+          tenantIds: values.tenantIds || [],
+          pageKeys: values.pageKeys || [],
         });
       }
       setIsModalOpen(false);
@@ -132,6 +171,51 @@ export default function UserManagement() {
       dataIndex: 'created_at',
       key: 'created_at',
       render: (date) => (date ? new Date(date).toLocaleDateString() : '-'),
+    },
+    {
+      title: 'Tenants',
+      dataIndex: 'tenant_permissions',
+      key: 'tenant_permissions',
+      render: (tenantPermissions = [], record) => {
+        if ((record.role === 'ADMIN' || record.role === 'MANAGER') && tenantPermissions.length === 0) {
+          return <Tag color="green">All Tenants</Tag>;
+        }
+        if (!tenantPermissions || tenantPermissions.length === 0) {
+          return <Tag color="default">None</Tag>;
+        }
+        const display = tenantPermissions.slice(0, 3);
+        return (
+          <Space size={[4, 4]} wrap>
+            {display.map((tenantId) => (
+              <Tag key={`${record.id}-${tenantId}`} color="geekblue">
+                {tenantId}
+              </Tag>
+            ))}
+            {tenantPermissions.length > display.length && <Tag>+{tenantPermissions.length - display.length}</Tag>}
+          </Space>
+        );
+      },
+    },
+    {
+      title: 'Pages',
+      dataIndex: 'page_permissions',
+      key: 'page_permissions',
+      render: (pagePermissions = []) => {
+        if (!pagePermissions || pagePermissions.length === 0) {
+          return <Tag color="green">All Pages</Tag>;
+        }
+        const display = pagePermissions.slice(0, 3);
+        return (
+          <Space size={[4, 4]} wrap>
+            {display.map((pageKey) => (
+              <Tag key={pageKey} color="purple">
+                {pageKey}
+              </Tag>
+            ))}
+            {pagePermissions.length > display.length && <Tag>+{pagePermissions.length - display.length}</Tag>}
+          </Space>
+        );
+      },
     },
     {
       title: 'Actions',
@@ -299,6 +383,48 @@ export default function UserManagement() {
               />
             </Form.Item>
           )}
+
+          <Form.Item
+            name="tenantIds"
+            label="Tenant Access"
+            rules={[
+              {
+                validator: (_, value) => {
+                  if (!isTenantRequired) {
+                    return Promise.resolve();
+                  }
+                  if (Array.isArray(value) && value.length > 0) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('Select at least one tenant'));
+                },
+              },
+            ]}
+          >
+            <Select
+              mode="multiple"
+              placeholder={isTenantRequired ? 'Select allowed tenants' : 'Select tenants (optional)'}
+              options={tenantOptions}
+              loading={tenantsLoading}
+              optionFilterProp="label"
+              allowClear
+            />
+          </Form.Item>
+
+          <Form.Item
+            name="pageKeys"
+            label="Page Access (optional)"
+            tooltip="Leave empty to allow user to access all pages within assigned tenants"
+          >
+            <Select
+              mode="multiple"
+              placeholder="Select specific pages or leave empty for all"
+              options={pageOptions}
+              loading={pagesLoading}
+              optionFilterProp="label"
+              allowClear
+            />
+          </Form.Item>
         </Form>
       </Modal>
     </div>
