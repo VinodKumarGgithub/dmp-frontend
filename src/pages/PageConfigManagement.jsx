@@ -778,22 +778,41 @@ useEffect(() => {
                               </Row>
                               {isPSql && (
                                 <>
+                                  <Alert
+                                    message="SQL Query Configuration"
+                                    description={
+                                      <div>
+                                        <Text type="secondary" style={{ fontSize: '12px' }}>
+                                          Enter your SQL query here. The system will automatically append WHERE, ORDER BY, and pagination clauses based on your search, filter, and sort configurations. 
+                                          <br />
+                                          <strong>Tips:</strong> Use table aliases (e.g., <code>pp.memberid</code>) for clarity. Test your query before saving.
+                                        </Text>
+                                      </div>
+                                    }
+                                    type="info"
+                                    showIcon
+                                    style={{ marginBottom: token.marginSM }}
+                                  />
                                   <Space style={{ marginTop: token.marginXS }}>
-                                    <Button
-                                      type="primary"
-                                      icon={<CheckCircleOutlined />}
-                                      loading={testingQuery}
-                                      onClick={handleTestProcedureQuery}
-                                    >
-                                      Test Query
-                                    </Button>
-                                    <Button
-                                      loading={detectingColumns}
-                                      onClick={() => handleDetectProcedureColumns()}
-                                      disabled={!pSqlValue}
-                                    >
-                                      Detect Columns
-                                    </Button>
+                                    <Tooltip title="Test your SQL query syntax and verify it executes correctly">
+                                      <Button
+                                        type="primary"
+                                        icon={<CheckCircleOutlined />}
+                                        loading={testingQuery}
+                                        onClick={handleTestProcedureQuery}
+                                      >
+                                        Test Query
+                                      </Button>
+                                    </Tooltip>
+                                    <Tooltip title="Automatically detect columns from your SQL query and populate the Columns tab">
+                                      <Button
+                                        loading={detectingColumns}
+                                        onClick={() => handleDetectProcedureColumns()}
+                                        disabled={!pSqlValue}
+                                      >
+                                        Detect Columns
+                                      </Button>
+                                    </Tooltip>
                                   </Space>
                                   {queryTestResult && (
                                     <Alert
@@ -856,7 +875,14 @@ useEffect(() => {
             <Col span={8}>
               <Form.Item
                 name="page_size_default"
-                label="Default Page Size"
+                label={
+                  <Space>
+                    <span>Default Page Size</span>
+                    <Tooltip title="Number of rows displayed per page. Users can change this in the table view.">
+                      <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                    </Tooltip>
+                  </Space>
+                }
                 rules={[{ required: true, message: 'Please enter page size' }]}
               >
                 <InputNumber min={1} max={100} style={{ width: '100%' }} />
@@ -865,7 +891,14 @@ useEffect(() => {
             <Col span={8}>
               <Form.Item
                 name="is_download_allowed"
-                label="Allow CSV Download"
+                label={
+                  <Space>
+                    <span>Allow Download</span>
+                    <Tooltip title="Enable users to download data as CSV or Excel. When enabled, users can export visible columns only.">
+                      <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                    </Tooltip>
+                  </Space>
+                }
                 valuePropName="checked"
               >
                 <Switch />
@@ -874,8 +907,14 @@ useEffect(() => {
             <Col span={8}>
               <Form.Item
                 name="download_row_limit"
-                label="Max Download Rows"
-                tooltip="Leave blank for unlimited downloads"
+                label={
+                  <Space>
+                    <span>Max Download Rows</span>
+                    <Tooltip title="Limit the maximum number of rows users can download. Leave blank for unlimited (not recommended for large datasets).">
+                      <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                    </Tooltip>
+                  </Space>
+                }
               >
                 <InputNumber
                   min={1}

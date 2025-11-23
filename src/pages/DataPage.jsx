@@ -30,6 +30,7 @@ import {
   SettingOutlined,
   ArrowUpOutlined,
   ArrowDownOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
@@ -619,38 +620,44 @@ function DataPage() {
               justifyContent: isMobile ? 'flex-start' : 'flex-end'
             }}
           >
-            <Button
-              icon={<SettingOutlined />}
-              onClick={() => setColumnModalOpen(true)}
-              disabled={!Array.isArray(config?.columns) || config.columns.length === 0}
-              aria-label="Configure column preferences"
-              aria-haspopup="dialog"
-            >
-              Columns
-            </Button>
+            <Tooltip title="Customize which columns appear in the table and their order. Your preferences are saved per page.">
+              <Button
+                icon={<SettingOutlined />}
+                onClick={() => setColumnModalOpen(true)}
+                disabled={!Array.isArray(config?.columns) || config.columns.length === 0}
+                aria-label="Configure column preferences"
+                aria-haspopup="dialog"
+              >
+                Columns
+              </Button>
+            </Tooltip>
             {config.is_download_allowed && (
               <Space.Compact>
-                <Select
-                  value={exportFormat}
-                  onChange={setExportFormat}
-                  disabled={downloading}
-                  style={{ width: 100 }}
-                  options={[
-                    { label: 'CSV', value: 'csv' },
-                    { label: 'Excel', value: 'excel' },
-                  ]}
-                  aria-label="Select export format"
-                />
-                <Button
-                  type="primary"
-                  icon={<DownloadOutlined />}
-                  onClick={handleDownload}
-                  disabled={isError || downloading}
-                  loading={downloading}
-                  aria-label={downloading ? 'Downloading data' : `Download data as ${exportFormat.toUpperCase()}`}
-                >
-                  {downloading ? 'Downloading...' : 'Download'}
-                </Button>
+                <Tooltip title="CSV: Simple text format, easy to import. Excel: Formatted with headers, borders, and styling.">
+                  <Select
+                    value={exportFormat}
+                    onChange={setExportFormat}
+                    disabled={downloading}
+                    style={{ width: 100 }}
+                    options={[
+                      { label: 'CSV', value: 'csv' },
+                      { label: 'Excel', value: 'excel' },
+                    ]}
+                    aria-label="Select export format"
+                  />
+                </Tooltip>
+                <Tooltip title={`Download current data as ${exportFormat.toUpperCase()}. Only visible columns will be included.`}>
+                  <Button
+                    type="primary"
+                    icon={<DownloadOutlined />}
+                    onClick={handleDownload}
+                    disabled={isError || downloading}
+                    loading={downloading}
+                    aria-label={downloading ? 'Downloading data' : `Download data as ${exportFormat.toUpperCase()}`}
+                  >
+                    {downloading ? 'Downloading...' : 'Download'}
+                  </Button>
+                </Tooltip>
               </Space.Compact>
             )}
             <Button 
@@ -680,6 +687,9 @@ function DataPage() {
             />
             <div id="search-help" style={{ fontSize: '12px', color: token.colorTextSecondary, marginTop: 4 }}>
               <Space size="small" wrap>
+                <Tooltip title="Global search searches across all listed fields simultaneously. Type your search term and press Enter or click the search icon.">
+                  <InfoCircleOutlined style={{ fontSize: 12, cursor: 'help' }} />
+                </Tooltip>
                 <span>Search in:</span>
                 {config.searchable_fields.map((field, idx) => {
                   const fieldName = typeof field === 'string' ? field : (field.name || field);
@@ -788,7 +798,14 @@ function DataPage() {
       </Card>
 
       <Modal
-        title="Column Preferences"
+        title={
+          <Space>
+            <span>Column Preferences</span>
+            <Tooltip title="Customize which columns appear in the table and their order. Changes apply immediately and are saved per page.">
+              <InfoCircleOutlined style={{ color: token.colorTextSecondary, fontSize: 14 }} />
+            </Tooltip>
+          </Space>
+        }
         open={columnModalOpen}
         onCancel={handleColumnModalClose}
         destroyOnClose={false}
@@ -813,6 +830,13 @@ function DataPage() {
           </Button>,
         ]}
       >
+        <Alert
+          message="Column Customization"
+          description="Check/uncheck columns to show or hide them. Use arrow buttons to reorder. Your preferences apply to both the table view and downloads."
+          type="info"
+          showIcon
+          style={{ marginBottom: token.marginMD }}
+        />
         {columnSettings.length === 0 ? (
           <Typography.Text type="secondary">No columns available for this page.</Typography.Text>
         ) : (

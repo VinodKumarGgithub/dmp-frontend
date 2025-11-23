@@ -14,6 +14,8 @@ import {
   Tag,
   Select,
   Breadcrumb,
+  Tooltip,
+  Alert,
 } from 'antd';
 import {
   PlusOutlined,
@@ -22,6 +24,7 @@ import {
   UserOutlined,
   LockOutlined,
   HomeOutlined,
+  InfoCircleOutlined,
 } from '@ant-design/icons';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '../api/users';
 import { useTenants } from '../api/tenants';
@@ -384,47 +387,72 @@ export default function UserManagement() {
             </Form.Item>
           )}
 
-          <Form.Item
-            name="tenantIds"
-            label="Tenant Access"
-            rules={[
-              {
-                validator: (_, value) => {
-                  if (!isTenantRequired) {
-                    return Promise.resolve();
-                  }
-                  if (Array.isArray(value) && value.length > 0) {
-                    return Promise.resolve();
-                  }
-                  return Promise.reject(new Error('Select at least one tenant'));
-                },
-              },
-            ]}
-          >
-            <Select
-              mode="multiple"
-              placeholder={isTenantRequired ? 'Select allowed tenants' : 'Select tenants (optional)'}
-              options={tenantOptions}
-              loading={tenantsLoading}
-              optionFilterProp="label"
-              allowClear
+          {effectiveRole === 'ADMIN' || effectiveRole === 'MANAGER' ? (
+            <Alert
+              message="Full Access"
+              description="Admin and Manager roles have access to all tenants and pages. No restrictions needed."
+              type="info"
+              showIcon
+              style={{ marginBottom: token.marginMD }}
             />
-          </Form.Item>
+          ) : (
+            <>
+              <Form.Item
+                name="tenantIds"
+                label={
+                  <Space>
+                    <span>Tenant Access</span>
+                    <Tooltip title="Select which tenants this user can access. Users can only view data from assigned tenants. At least one tenant is required for non-admin users.">
+                      <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                    </Tooltip>
+                  </Space>
+                }
+                rules={[
+                  {
+                    validator: (_, value) => {
+                      if (!isTenantRequired) {
+                        return Promise.resolve();
+                      }
+                      if (Array.isArray(value) && value.length > 0) {
+                        return Promise.resolve();
+                      }
+                      return Promise.reject(new Error('Select at least one tenant'));
+                    },
+                  },
+                ]}
+              >
+                <Select
+                  mode="multiple"
+                  placeholder={isTenantRequired ? 'Select allowed tenants' : 'Select tenants (optional)'}
+                  options={tenantOptions}
+                  loading={tenantsLoading}
+                  optionFilterProp="label"
+                  allowClear
+                />
+              </Form.Item>
 
-          <Form.Item
-            name="pageKeys"
-            label="Page Access (optional)"
-            tooltip="Leave empty to allow user to access all pages within assigned tenants"
-          >
-            <Select
-              mode="multiple"
-              placeholder="Select specific pages or leave empty for all"
-              options={pageOptions}
-              loading={pagesLoading}
-              optionFilterProp="label"
-              allowClear
-            />
-          </Form.Item>
+              <Form.Item
+                name="pageKeys"
+                label={
+                  <Space>
+                    <span>Page Access</span>
+                    <Tooltip title="Optionally restrict user to specific pages. Leave empty to allow access to all pages within assigned tenants.">
+                      <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                    </Tooltip>
+                  </Space>
+                }
+              >
+                <Select
+                  mode="multiple"
+                  placeholder="Select specific pages or leave empty for all"
+                  options={pageOptions}
+                  loading={pagesLoading}
+                  optionFilterProp="label"
+                  allowClear
+                />
+              </Form.Item>
+            </>
+          )}
         </Form>
       </Modal>
     </div>
