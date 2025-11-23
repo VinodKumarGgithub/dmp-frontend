@@ -493,9 +493,9 @@ function DataPage() {
           ]}
         />
         <ErrorDisplay error={error} config={config} />
-        <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ marginTop: token.marginMD }}>
-          Retry
-        </Button>
+          <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ marginTop: token.marginMD }}>
+            Retry
+          </Button>
       </div>
     );
   }
@@ -647,16 +647,16 @@ function DataPage() {
                   />
                 </Tooltip>
                 <Tooltip title={`Download current data as ${exportFormat.toUpperCase()}. Only visible columns will be included.`}>
-                  <Button
-                    type="primary"
-                    icon={<DownloadOutlined />}
-                    onClick={handleDownload}
-                    disabled={isError || downloading}
-                    loading={downloading}
+              <Button
+                type="primary"
+                icon={<DownloadOutlined />}
+                onClick={handleDownload}
+                disabled={isError || downloading}
+                loading={downloading}
                     aria-label={downloading ? 'Downloading data' : `Download data as ${exportFormat.toUpperCase()}`}
-                  >
+              >
                     {downloading ? 'Downloading...' : 'Download'}
-                  </Button>
+              </Button>
                 </Tooltip>
               </Space.Compact>
             )}
@@ -715,6 +715,14 @@ function DataPage() {
             size="small"
             style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
             aria-label="Filter options"
+            title={
+              <Space>
+                <span>Filters</span>
+                <Tooltip title="Apply filters to narrow down results. Filters work together (AND logic). Use Reset to clear all filters.">
+                  <InfoCircleOutlined style={{ color: token.colorTextSecondary, fontSize: 12 }} />
+                </Tooltip>
+              </Space>
+            }
           >
             <Form form={form} layout="inline">
               <Row gutter={[16, 16]} align="bottom" style={{ width: '100%' }}>
@@ -912,30 +920,30 @@ function DataPage() {
               // Show only hidden columns (columns not visible in the table)
               if (hiddenColumns.length > 0) {
                 return hiddenColumns.map((col) => {
-                  const value = selectedRecord[col.name];
-                  let displayValue = '-';
-                  if (value !== null && value !== undefined) {
-                    if (col.type === 'date' && value) {
-                      displayValue = new Date(value).toLocaleDateString();
-                    } else {
-                      displayValue = String(value);
-                    }
-                  }
-                  return (
-                    <Descriptions.Item key={col.name} label={col.label || col.name}>
-                      <div
-                        style={{
-                          wordBreak: 'break-word',
-                          color: token.colorText,
-                        }}
-                      >
-                        {displayValue}
-                      </div>
-                    </Descriptions.Item>
-                  );
+              const value = selectedRecord[col.name];
+              let displayValue = '-';
+              if (value !== null && value !== undefined) {
+                if (col.type === 'date' && value) {
+                  displayValue = new Date(value).toLocaleDateString();
+                } else {
+                  displayValue = String(value);
+                }
+              }
+              return (
+                <Descriptions.Item key={col.name} label={col.label || col.name}>
+                  <div
+                    style={{
+                      wordBreak: 'break-word',
+                      color: token.colorText,
+                    }}
+                  >
+                    {displayValue}
+                  </div>
+                </Descriptions.Item>
+              );
                 });
               }
-
+              
               // Fallback: if no column config, show all fields not in visible columns
               if (selectedRecord && typeof selectedRecord === 'object') {
                 const visibleSet = new Set(visibleColumnNames);
@@ -943,31 +951,31 @@ function DataPage() {
                 
                 if (hiddenFields.length > 0) {
                   return hiddenFields.map(([key, value]) => {
-                    let displayValue = '-';
-                    if (value !== null && value !== undefined) {
-                      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-                        try {
-                          displayValue = new Date(value).toLocaleDateString();
-                        } catch {
-                          displayValue = String(value);
-                        }
-                      } else {
-                        displayValue = String(value);
-                      }
+                let displayValue = '-';
+                if (value !== null && value !== undefined) {
+                  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
+                    try {
+                      displayValue = new Date(value).toLocaleDateString();
+                    } catch {
+                      displayValue = String(value);
                     }
-                    return (
+                  } else {
+                    displayValue = String(value);
+                  }
+                }
+                return (
                       <Descriptions.Item key={key} label={key.replace(/_/g, ' ').toUpperCase()}>
-                        <div
-                          style={{
-                            wordBreak: 'break-word',
-                            color: token.colorText,
-                          }}
-                        >
-                          {displayValue}
-                        </div>
-                      </Descriptions.Item>
-                    );
-                  });
+                    <div
+                      style={{
+                        wordBreak: 'break-word',
+                        color: token.colorText,
+                      }}
+                    >
+                      {displayValue}
+                    </div>
+                  </Descriptions.Item>
+                );
+              });
                 }
               }
 

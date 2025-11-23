@@ -382,7 +382,7 @@ export default function PageConfigManagement() {
   };
 
   // Auto-populate columns when table/view columns are loaded
-useEffect(() => {
+  useEffect(() => {
   if (!(currentSourceType === 'TABLE' || currentSourceType === 'VIEW')) {
     return;
   }
@@ -400,16 +400,16 @@ useEffect(() => {
     }));
     setAvailableColumns(deriveColumnOptions(normalizedColumns));
 
-    const currentColumns = form.getFieldValue('columns') || [];
-    const currentDataSource = form.getFieldValue('data_source');
-    const shouldPopulate = (currentColumns.length === 0 || (currentColumns.length === 1 && !currentColumns[0].name)) &&
-                           (!editingPage || currentDataSource === selectedTable);
-
-    if (shouldPopulate) {
+      const currentColumns = form.getFieldValue('columns') || [];
+      const currentDataSource = form.getFieldValue('data_source');
+      const shouldPopulate = (currentColumns.length === 0 || (currentColumns.length === 1 && !currentColumns[0].name)) &&
+                             (!editingPage || currentDataSource === selectedTable);
+      
+      if (shouldPopulate) {
       form.setFieldsValue({ columns: normalizedColumns });
+      }
     }
-  }
-}, [tableColumns, selectedTable, editingPage, form, currentSourceType]);
+  }, [tableColumns, selectedTable, editingPage, form, currentSourceType]);
 
   // Auto-populate procedure parameters when procedure parameters are loaded
   useEffect(() => {
@@ -717,48 +717,48 @@ useEffect(() => {
                           const pSqlValue = isPSql ? form.getFieldValue(['source_params', name, 'value']) : null;
 
                           return (
-                            <Card
-                              key={key}
-                              size="small"
-                              style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
-                              extra={
-                                <Button
-                                  type="text"
-                                  danger
-                                  icon={<DeleteFilled />}
-                                  onClick={() => remove(name)}
-                                />
-                              }
-                            >
-                              <Row gutter={16}>
-                                <Col span={8}>
-                                  <Form.Item
-                                    {...restField}
-                                    name={[name, 'name']}
-                                    label="Parameter Name"
-                                    rules={[{ required: true, message: 'Required' }]}
-                                  >
+                          <Card
+                            key={key}
+                            size="small"
+                            style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
+                            extra={
+                              <Button
+                                type="text"
+                                danger
+                                icon={<DeleteFilled />}
+                                onClick={() => remove(name)}
+                              />
+                            }
+                          >
+                            <Row gutter={16}>
+                              <Col span={8}>
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, 'name']}
+                                  label="Parameter Name"
+                                  rules={[{ required: true, message: 'Required' }]}
+                                >
                                     <Input placeholder="e.g., p_sql or start_date" disabled={isPSql} />
-                                  </Form.Item>
-                                </Col>
-                                <Col span={6}>
-                                  <Form.Item
-                                    {...restField}
-                                    name={[name, 'type']}
-                                    label="Type"
-                                    initialValue="string"
-                                  >
+                                </Form.Item>
+                              </Col>
+                              <Col span={6}>
+                                <Form.Item
+                                  {...restField}
+                                  name={[name, 'type']}
+                                  label="Type"
+                                  initialValue="string"
+                                >
                                     <Select disabled={isPSql}>
-                                      <Option value="string">String</Option>
-                                      <Option value="number">Number</Option>
-                                      <Option value="boolean">Boolean</Option>
-                                      <Option value="date">Date</Option>
-                                    </Select>
-                                  </Form.Item>
-                                </Col>
-                                <Col span={10}>
-                                  <Form.Item
-                                    {...restField}
+                                    <Option value="string">String</Option>
+                                    <Option value="number">Number</Option>
+                                    <Option value="boolean">Boolean</Option>
+                                    <Option value="date">Date</Option>
+                                  </Select>
+                                </Form.Item>
+                              </Col>
+                              <Col span={10}>
+                                <Form.Item
+                                  {...restField}
                                     name={[name, 'value']}
                                     label={isPSql ? 'SQL Query (p_sql)' : 'Default Value'}
                                     rules={isPSql ? [{ required: true, message: 'SQL query is required' }] : []}
@@ -771,11 +771,11 @@ useEffect(() => {
                                         onChange={() => setQueryTestResult(null)}
                                       />
                                     ) : (
-                                      <Input placeholder="Optional default value" />
+                                  <Input placeholder="Optional default value" />
                                     )}
-                                  </Form.Item>
-                                </Col>
-                              </Row>
+                                </Form.Item>
+                              </Col>
+                            </Row>
                               {isPSql && (
                                 <>
                                   <Alert
@@ -836,7 +836,7 @@ useEffect(() => {
                                   )}
                                 </>
                               )}
-                            </Card>
+                          </Card>
                           );
                         })}
                         <Button
@@ -971,9 +971,9 @@ useEffect(() => {
               );
             }}
           </Form.Item>
-          <Form.List name="columns">
-            {(fields, { add, remove }) => (
-              <>
+        <Form.List name="columns">
+          {(fields, { add, remove }) => (
+            <>
               {fields.map(({ key, name, ...restField }) => (
                 <Card
                   key={key}
@@ -1265,7 +1265,7 @@ useEffect(() => {
                             label="Filter Label"
                             rules={[{ required: true, message: 'Required' }]}
                           >
-                                  <Input placeholder="e.g., Status" />
+                            <Input placeholder="e.g., Status" />
                           </Form.Item>
                         </Col>
                         <Col span={8}>
