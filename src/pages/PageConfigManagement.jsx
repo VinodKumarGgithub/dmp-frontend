@@ -42,6 +42,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import usePageConfigColumnsStore from '../stores/pageConfigColumnsStore';
+import PageTenantAccessManager from '../components/PageTenantAccessManager';
 
 const normalizeSourceParams = (params = []) => {
   if (!Array.isArray(params)) {
@@ -1423,6 +1424,20 @@ export default function PageConfigManagement() {
             }}
           </Form.Item>
         </>
+      ),
+    },
+    {
+      key: 'tenant-access',
+      label: 'Tenant Access',
+      children: editingPage ? (
+        <PageTenantAccessManager pageKey={editingPage.page_key} form={form} />
+      ) : (
+        <Alert
+          message="Save page first"
+          description="Please save the page configuration before managing tenant access."
+          type="info"
+          showIcon
+        />
       ),
     },
   ];

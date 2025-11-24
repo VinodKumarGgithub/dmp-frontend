@@ -9,14 +9,10 @@ export function useUsers(options = {}) {
   return useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      try {
-        const res = await axiosInstance.get('/users');
-        return res.data || res;
-      } catch (error) {
-        handleApiError(error);
-        throw error;
-      }
+      const res = await axiosInstance.get('/users');
+      return res.data || res;
     },
+    // Error handling is done globally in QueryClient onError to prevent duplicate toasts on retries
     ...options,
   });
 }

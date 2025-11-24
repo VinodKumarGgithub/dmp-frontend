@@ -13,15 +13,11 @@ export function usePages(options = {}) {
   return useQuery({
     queryKey: ['pages'],
     queryFn: async () => {
-      try {
-        const res = await axiosInstance.get('/pages');
-        return res.data || res;
-      } catch (error) {
-        handleApiError(error);
-        throw error;
-      }
+      const res = await axiosInstance.get('/pages');
+      return res.data || res;
     },
     enabled,
+    // Error handling is done globally in QueryClient onError to prevent duplicate toasts on retries
   });
 }
 
@@ -32,15 +28,11 @@ export function usePageConfig(pageKey) {
   return useQuery({
     queryKey: ['pages', pageKey, 'config'],
     queryFn: async () => {
-      try {
-        const res = await axiosInstance.get(`/pages/${pageKey}/config`);
-        return res.data || res;
-      } catch (error) {
-        handleApiError(error);
-        throw error;
-      }
+      const res = await axiosInstance.get(`/pages/${pageKey}/config`);
+      return res.data || res;
     },
     enabled: !!pageKey,
+    // Error handling is done globally in QueryClient onError to prevent duplicate toasts on retries
   });
 }
 
@@ -51,17 +43,13 @@ export function usePageData(pageKey, queryParams = {}) {
   return useQuery({
     queryKey: ['pages', pageKey, 'data', queryParams],
     queryFn: async () => {
-      try {
-        const res = await axiosInstance.get(`/pages/${pageKey}/data`, {
-          params: queryParams,
-        });
-        return res.data || res;
-      } catch (error) {
-        handleApiError(error);
-        throw error;
-      }
+      const res = await axiosInstance.get(`/pages/${pageKey}/data`, {
+        params: queryParams,
+      });
+      return res.data || res;
     },
     enabled: !!pageKey,
+    // Error handling is done globally in QueryClient onError to prevent duplicate toasts on retries
   });
 }
 
@@ -72,21 +60,16 @@ export function usePage(pageKey, queryParams = {}) {
   return useQuery({
     queryKey: ['pages', pageKey, queryParams],
     queryFn: async () => {
-      try {
-        const res = await axiosInstance.get(`/pages/${pageKey}`, {
-          params: queryParams,
-        });
-        // Axios interceptor returns response.data which is { success: true, message: "...", data: { config, data, total } }
-        // Extract the nested data object
-        if (res && res.data && typeof res.data === 'object' && 'config' in res.data) {
-          return res.data;
-        }
-        // Fallback: if structure is different, return as-is
-        return res.data || res;
-      } catch (error) {
-        handleApiError(error);
-        throw error;
+      const res = await axiosInstance.get(`/pages/${pageKey}`, {
+        params: queryParams,
+      });
+      // Axios interceptor returns response.data which is { success: true, message: "...", data: { config, data, total } }
+      // Extract the nested data object
+      if (res && res.data && typeof res.data === 'object' && 'config' in res.data) {
+        return res.data;
       }
+      // Fallback: if structure is different, return as-is
+      return res.data || res;
     },
     enabled: !!pageKey,
     // Keep previous data while fetching new data (prevents UI flicker)

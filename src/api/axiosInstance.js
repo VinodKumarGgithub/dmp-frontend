@@ -54,28 +54,41 @@ axiosInstance.interceptors.response.use(
                       error.message || 
                       null;
     
-    // Format error message (without code): Show message, or use details if message is not available
+    // Format error message: Show message with details in brackets if both exist
     let formattedMessage;
-    if (rawMessage) {
+    let detailsText = null;
+    if (errorDetails) {
+      if (Array.isArray(errorDetails) && errorDetails.length > 0) {
+        detailsText = errorDetails.join('; ');
+      } else if (typeof errorDetails === 'string') {
+        detailsText = errorDetails;
+      }
+    }
+    
+    if (rawMessage && detailsText) {
+      // Both message and details: concatenate with brackets
+      formattedMessage = `${rawMessage} (${detailsText})`;
+    } else if (rawMessage) {
       formattedMessage = rawMessage;
-    } else if (errorDetails) {
-      formattedMessage = Array.isArray(errorDetails) && errorDetails.length > 0
-        ? errorDetails[0]
-        : (typeof errorDetails === 'string' ? errorDetails : 'An error occurred');
+    } else if (detailsText) {
+      formattedMessage = detailsText;
     } else {
       formattedMessage = 'An error occurred';
     }
 
-    // Check if error should skip toast (set in request config)
-    const skipToast = error.config?.skipToast || false;
+    // Skip toast by default - let hooks/components handle error display via handleApiError
+    // Only show toast if explicitly requested via config.skipToast = false
+    // This prevents duplicate toasts (interceptor + handleApiError)
+    const showToast = error.config?.showToast === true; // Explicitly opt-in
+    const skipToast = error.config?.skipToast === true; // Explicitly opt-out
     
-    // Only show toast if not explicitly skipped (components will handle their own toasts)
     // Skip toast for auth errors as they're handled by handleApiError
     const isAuthError = error.config?.url?.includes('/auth/');
     
-    if (!skipToast && !isAuthError) {
-      // Show formatted message with code
-      const duration = errorCode === 'USER_BLOCKED' ? 6 : 4;
+    // Only show toast if explicitly requested and not skipped
+    // By default, skip toast - let hooks/components handle it via handleApiError
+    if (showToast && !skipToast && !isAuthError) {
+      const duration = (errorCode === 'USER_BLOCKED' || errorCode === 'DANGEROUS_SQL_DETECTED') ? 6 : 4;
       message.error(formattedMessage, duration);
     }
 

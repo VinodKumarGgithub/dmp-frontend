@@ -15,19 +15,15 @@ export function useTenants(filters = {}, options = {}) {
   return useQuery({
     queryKey: ['tenants', filters],
     queryFn: async () => {
-      try {
-        const params = {};
-        if (filters.status) params.status = filters.status;
-        if (filters.search) params.search = filters.search;
+      const params = {};
+      if (filters.status) params.status = filters.status;
+      if (filters.search) params.search = filters.search;
 
-        const res = await axiosInstance.get('/tenants', { params });
-        return res.data || res;
-      } catch (error) {
-        handleApiError(error);
-        throw error;
-      }
+      const res = await axiosInstance.get('/tenants', { params });
+      return res.data || res;
     },
     enabled,
+    // Error handling is done globally in QueryClient onError to prevent duplicate toasts on retries
   });
 }
 
@@ -40,15 +36,11 @@ export function useTenant(tenantId, options = {}) {
   return useQuery({
     queryKey: ['tenants', tenantId],
     queryFn: async () => {
-      try {
-        const res = await axiosInstance.get(`/tenants/${tenantId}`);
-        return res.data || res;
-      } catch (error) {
-        handleApiError(error);
-        throw error;
-      }
+      const res = await axiosInstance.get(`/tenants/${tenantId}`);
+      return res.data || res;
     },
     enabled: enabled && !!tenantId,
+    // Error handling is done globally in QueryClient onError to prevent duplicate toasts on retries
   });
 }
 

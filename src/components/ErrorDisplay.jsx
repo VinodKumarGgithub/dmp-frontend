@@ -144,15 +144,28 @@ export default function ErrorDisplay({ error, config }) {
           }
           description={
             <div>
-              {/* Show message only (without code), use details if message is not available */}
+              {/* Show message with details in brackets if both exist */}
               <Paragraph style={{ marginBottom: 8 }}>
-                {errorMessage || 
-                  (errorDetails 
-                    ? (Array.isArray(errorDetails) && errorDetails.length > 0 
-                        ? errorDetails[0] 
-                        : String(errorDetails))
-                    : 'An error occurred')
-                }
+                {(() => {
+                  let detailsText = null;
+                  if (errorDetails) {
+                    if (Array.isArray(errorDetails) && errorDetails.length > 0) {
+                      detailsText = errorDetails.join('; ');
+                    } else if (typeof errorDetails === 'string') {
+                      detailsText = errorDetails;
+                    }
+                  }
+                  
+                  if (errorMessage && detailsText) {
+                    return `${errorMessage} (${detailsText})`;
+                  } else if (errorMessage) {
+                    return errorMessage;
+                  } else if (detailsText) {
+                    return detailsText;
+                  } else {
+                    return 'An error occurred';
+                  }
+                })()}
               </Paragraph>
               {lineNumber && (
                 <Text type="secondary" aria-label={`Error at line ${lineNumber}`}>

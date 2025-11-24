@@ -6,6 +6,7 @@ import { App as AntdApp, ConfigProvider, message } from 'antd';
 import enUS from 'antd/locale/en_US';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { handleApiError } from './utils/errorHandler';
 import 'antd/dist/reset.css';
 
 // Configure Ant Design message to show only one toast at a time
@@ -27,6 +28,20 @@ const queryClient = new QueryClient({
         // Retry up to 2 times for network/server errors
         return failureCount < 2;
       },
+      // Global error handler for queries - only show toast on final failure (not retries)
+      // This prevents duplicate toasts when React Query retries failed requests
+      onError: (error, query) => {
+        // Check if this is a 4xx error (client error - no retry) or final retry failure
+        // 4xx errors: retry returns false immediately, so failureCount = 0 but it's final
+        // 5xx errors: retry up to 2 times, so failureCount 0,1 are retries, 2 is final
+        const is4xxError = error?.response?.status >= 400 && error?.response?.status < 500;
+        const isFinalRetry = query.state.failureCount >= 2;
+        
+        // Only show toast on final failure (4xx errors or after all retries exhausted)
+        if (is4xxError || isFinalRetry) {
+          handleApiError(error);
+        }
+      },
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
       staleTime: 5 * 60 * 1000, // 5 minutes - data is fresh for 5 minutes
@@ -36,6 +51,7 @@ const queryClient = new QueryClient({
     },
     mutations: {
       retry: 0,
+      // Mutations don't retry, so handleApiError in hooks is fine (no duplicates)
       // Optimistic updates can be added per mutation
     },
   },

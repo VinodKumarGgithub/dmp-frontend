@@ -13,14 +13,10 @@ export function useAdminUsers(options = {}) {
   return useQuery({
     queryKey: ['adminUsers'],
     queryFn: async () => {
-      try {
-        const res = await axiosInstance.get('/admin/users');
-        return res.data || res;
-      } catch (error) {
-        handleApiError(error);
-        throw error;
-      }
+      const res = await axiosInstance.get('/admin/users');
+      return res.data || res;
     },
+    // Error handling is done globally in QueryClient onError to prevent duplicate toasts on retries
     ...options,
   });
 }
@@ -32,14 +28,10 @@ export function useBlockedUsers(options = {}) {
   return useQuery({
     queryKey: ['blockedUsers'],
     queryFn: async () => {
-      try {
-        const res = await axiosInstance.get('/admin/users/blocked');
-        return res.data || res;
-      } catch (error) {
-        handleApiError(error);
-        throw error;
-      }
+      const res = await axiosInstance.get('/admin/users/blocked');
+      return res.data || res;
     },
+    // Error handling is done globally in QueryClient onError to prevent duplicate toasts on retries
     ...options,
   });
 }
@@ -94,3 +86,48 @@ export function useUnblockUser() {
   });
 }
 
+/**
+ * Page Tenant Access API Hooks
+ */
+
+/**
+ * Fetch tenant access for a page
+ */
+export function usePageTenantAccess(pageKey, options = {}) {
+  return useQuery({
+    queryKey: ['pageTenantAccess', pageKey],
+    queryFn: async () => {
+      const res = await axiosInstance.get(`/admin/pages/${pageKey}/tenants`);
+      return res.data || res;
+    },
+    enabled: !!pageKey,
+    // Error handling is done globally in QueryClient onError to prevent duplicate toasts on retries
+    ...options,
+  });
+}
+
+/**
+ * Update tenant access for a page
+ */
+export function useUpdatePageTenantAccess() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ pageKey, tenantIds }) => {
+      try {
+        const res = await axiosInstance.put(`/admin/pages/${pageKey}/tenants`, {
+          tenantIds: Array.isArray(tenantIds) ? tenantIds : [],
+        });
+        return res.data || res;
+      } catch (error) {
+        handleApiError(error);
+        throw error;
+      }
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['pageTenantAccess', variables.pageKey] });
+      queryClient.invalidateQueries({ queryKey: ['pages'] }); // Refresh page list
+      showSuccess('Page tenant access updated successfully');
+    },
+  });
+}

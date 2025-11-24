@@ -7,15 +7,11 @@ export function usePagePreferences(pageKey, options = {}) {
     queryKey: ['page-preferences', pageKey],
     queryFn: async () => {
       if (!pageKey) return { tableColumns: [], downloadColumns: [] };
-      try {
-        const res = await axiosInstance.get(`/page-preferences/${pageKey}`);
-        return res.data?.data || res.data || { tableColumns: [], downloadColumns: [] };
-      } catch (error) {
-        handleApiError(error);
-        throw error;
-      }
+      const res = await axiosInstance.get(`/page-preferences/${pageKey}`);
+      return res.data?.data || res.data || { tableColumns: [], downloadColumns: [] };
     },
     enabled: !!pageKey && (options.enabled ?? true),
+    // Error handling is done globally in QueryClient onError to prevent duplicate toasts on retries
   });
 }
 

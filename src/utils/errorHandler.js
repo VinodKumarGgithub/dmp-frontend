@@ -1,3 +1,4 @@
+import React from 'react';
 import { message as antdMessage } from 'antd';
 
 /**
@@ -10,17 +11,28 @@ import { message as antdMessage } from 'antd';
 /**
  * Format error message (without code prefix)
  * Shows: Message if message exists, otherwise uses details
+ * If both message and details exist, shows: "Message (details)"
  */
 function formatErrorMessage(message, details) {
-  // Use message if available, otherwise use details
   let displayMessage = message;
   
-  if (!displayMessage && details) {
+  // Format details for display
+  let detailsText = null;
+  if (details) {
     if (Array.isArray(details) && details.length > 0) {
-      displayMessage = details[0];
+      // Join multiple details with semicolon
+      detailsText = details.join('; ');
     } else if (typeof details === 'string') {
-      displayMessage = details;
+      detailsText = details;
     }
+  }
+  
+  // If no message but we have details, use details
+  if (!displayMessage && detailsText) {
+    displayMessage = detailsText;
+  } else if (displayMessage && detailsText) {
+    // If both message and details exist, concatenate with brackets
+    displayMessage = `${displayMessage} (${detailsText})`;
   }
   
   // If still no message, use default
@@ -48,19 +60,58 @@ export function handleApiError(error, options = {}) {
   // Format error message (without code), using details as fallback
   const formattedMessage = formatErrorMessage(rawMessage, errorDetails);
 
+  // Extract details text separately for helper text
+  let detailsText = null;
+  if (errorDetails) {
+    if (Array.isArray(errorDetails) && errorDetails.length > 0) {
+      detailsText = errorDetails.join('; ');
+    } else if (typeof errorDetails === 'string') {
+      detailsText = errorDetails;
+    }
+  }
+
   // For USER_BLOCKED and DANGEROUS_SQL_DETECTED, show longer duration
   const duration = (errorCode === 'USER_BLOCKED' || errorCode === 'DANGEROUS_SQL_DETECTED') ? 6 : 4;
 
   if (showToast) {
-    if (errorCode === 'USER_BLOCKED' || errorCode === 'DANGEROUS_SQL_DETECTED') {
-      antdMessage.error({
-        content: formattedMessage,
-        duration: duration,
-        style: { marginTop: '20vh' },
-      });
+    // Build toast content with helper text if details exist
+    // Use Ant Design's built-in toast size and positioning (no hardcoded styles)
+    let toastContent;
+    
+    if (rawMessage && detailsText && rawMessage !== detailsText) {
+      // Show message with details as helper text
+      toastContent = React.createElement(
+        'div',
+        null,
+        React.createElement(
+          'div',
+          { style: { fontWeight: 500, marginBottom: 4 } },
+          rawMessage
+        ),
+        React.createElement(
+          'div',
+          {
+            style: {
+              fontSize: '12px',
+              opacity: 0.85,
+              marginTop: 4,
+              lineHeight: '1.4',
+              wordBreak: 'break-word'
+            }
+          },
+          detailsText
+        )
+      );
     } else {
-      antdMessage.error(formattedMessage, duration);
+      // Just show formatted message
+      toastContent = formattedMessage;
     }
+
+    // Show toast using Ant Design's default positioning and sizing
+    antdMessage.error({
+      content: toastContent,
+      duration: duration,
+    });
   }
 
   return {
