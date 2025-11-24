@@ -10,6 +10,7 @@ import ThemeToggle from '../components/ThemeToggle';
 import PageSwitcher from '../components/PageSwitcher';
 import { protectedRoutes } from '../config/routes';
 import useAppConfigStore from '../stores/appConfigStore';
+import { getUserAvatarUrl } from '../utils/gravatar';
 
 export default function AppLayout({ children }) {
   const navigate = useNavigate();
@@ -140,7 +141,7 @@ export default function AppLayout({ children }) {
         return <Link to={item.path || '/'}>{dom}</Link>;
       }}
       avatarProps={{
-        src: null,
+        src: getUserAvatarUrl(user, 40),
         title: user?.name || user?.username || 'User',
         icon: <UserOutlined />,
         size: 'small',

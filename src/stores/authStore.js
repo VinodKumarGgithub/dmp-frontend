@@ -41,6 +41,7 @@ const useAuthStore = create(
             name: payload.name,
             email: payload.email,
             phone_number: payload.phone_number,
+            profile_picture: payload.profile_picture,
           };
           
           set({ user: userData, pagesLoading: true });

@@ -19,6 +19,8 @@ import {
   Descriptions,
   Switch,
   Empty,
+  Upload,
+  Popconfirm,
 } from 'antd';
 import {
   UserOutlined,
@@ -37,8 +39,17 @@ import {
   MoonOutlined,
   GlobalOutlined,
   FontSizeOutlined,
+  CameraOutlined,
+  DeleteOutlined,
+  UploadOutlined,
 } from '@ant-design/icons';
-import { useProfile, useUpdateProfile, useChangePassword } from '../api/profile';
+import {
+  useProfile,
+  useUpdateProfile,
+  useChangePassword,
+  useUpdateProfilePicture,
+  useRemoveProfilePicture,
+} from '../api/profile';
 import { usePreferences, useUpdatePreferences } from '../api/profile';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
@@ -50,6 +61,7 @@ import {
   getRecommendedFonts,
   getFontsByCategory,
 } from '../utils/fontLoader';
+import { getUserAvatarUrl } from '../utils/gravatar';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -68,6 +80,8 @@ export default function ProfilePage() {
   const updateProfileMutation = useUpdateProfile();
   const changePasswordMutation = useChangePassword();
   const updatePreferencesMutation = useUpdatePreferences();
+  const updateProfilePictureMutation = useUpdateProfilePicture();
+  const removeProfilePictureMutation = useRemoveProfilePicture();
 
   const [profileForm] = Form.useForm();
   const [passwordForm] = Form.useForm();
@@ -100,6 +114,7 @@ export default function ProfilePage() {
           name: result.data.name,
           email: result.data.email,
           phone_number: result.data.phone_number,
+          profile_picture: result.data.profile_picture,
         });
       }
 
@@ -172,17 +187,105 @@ export default function ProfilePage() {
                   backgroundColor: token.colorPrimary,
                 }}
               >
-                <Avatar
-                  size={120}
-                  icon={<UserOutlined />}
-                  style={{
-                    backgroundColor: token.colorPrimary,
-                    fontSize: 48,
-                    border: `4px solid ${token.colorBgContainer}`,
-                    boxShadow: token.boxShadow,
-                  }}
-                />
+                <div style={{ position: 'relative', display: 'inline-block' }}>
+                  <Avatar
+                    size={120}
+                    src={getUserAvatarUrl(profile, 240)}
+                    icon={<UserOutlined />}
+                    style={{
+                      backgroundColor: token.colorPrimary,
+                      fontSize: 48,
+                      border: `4px solid ${token.colorBgContainer}`,
+                      boxShadow: token.boxShadow,
+                    }}
+                  />
+                  <Upload
+                    showUploadList={false}
+                    beforeUpload={(file) => {
+                      const isImage = file.type.startsWith('image/');
+                      if (!isImage) {
+                        message.error('You can only upload image files!');
+                        return false;
+                      }
+                      const isLt2M = file.size / 1024 / 1024 < 2;
+                      if (!isLt2M) {
+                        message.error('Image must be smaller than 2MB!');
+                        return false;
+                      }
+                      
+                      // Convert to base64
+                      const reader = new FileReader();
+                      reader.onload = (e) => {
+                        const base64 = e.target.result;
+                        updateProfilePictureMutation.mutate(base64, {
+                          onSuccess: (data) => {
+                            if (data?.data?.profile_picture) {
+                              setUser({
+                                ...currentUser,
+                                profile_picture: data.data.profile_picture,
+                              });
+                            }
+                          },
+                        });
+                      };
+                      reader.readAsDataURL(file);
+                      return false; // Prevent auto upload
+                    }}
+                    accept="image/*"
+                  >
+                    <Button
+                      type="primary"
+                      shape="circle"
+                      icon={<CameraOutlined />}
+                      size="small"
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        right: 0,
+                        boxShadow: token.boxShadow,
+                      }}
+                    />
+                  </Upload>
+                  {profile?.profile_picture && (
+                    <Popconfirm
+                      title="Remove profile picture?"
+                      description="Are you sure you want to remove your profile picture?"
+                      onConfirm={() => {
+                        removeProfilePictureMutation.mutate(undefined, {
+                          onSuccess: () => {
+                            setUser({
+                              ...currentUser,
+                              profile_picture: null,
+                            });
+                          },
+                        });
+                      }}
+                      okText="Yes"
+                      cancelText="No"
+                    >
+                      <Button
+                        type="primary"
+                        danger
+                        shape="circle"
+                        icon={<DeleteOutlined />}
+                        size="small"
+                        style={{
+                          position: 'absolute',
+                          bottom: 0,
+                          left: 0,
+                          boxShadow: token.boxShadow,
+                        }}
+                      />
+                    </Popconfirm>
+                  )}
+                </div>
               </Badge>
+              <div style={{ marginTop: token.marginMD }}>
+                <Text type="secondary" style={{ fontSize: 12 }}>
+                  {profile?.profile_picture ? 'Click camera to change' : 'Click camera to upload'}
+                  {profile?.email && !profile?.profile_picture && ' or use Gravatar'}
+                </Text>
+              </div>
             </div>
           </Col>
           <Col xs={24} sm={24} md={18}>

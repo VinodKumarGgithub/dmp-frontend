@@ -100,3 +100,51 @@ export function useUpdatePreferences() {
   });
 }
 
+/**
+ * Update profile picture
+ */
+export function useUpdateProfilePicture() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (profilePicture) => {
+      try {
+        const res = await axiosInstance.put('/profile/picture', {
+          profile_picture: profilePicture,
+        });
+        return res.data || res;
+      } catch (error) {
+        handleApiError(error);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      showSuccess('Profile picture updated successfully');
+    },
+  });
+}
+
+/**
+ * Remove profile picture
+ */
+export function useRemoveProfilePicture() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async () => {
+      try {
+        const res = await axiosInstance.delete('/profile/picture');
+        return res.data || res;
+      } catch (error) {
+        handleApiError(error);
+        throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
+      showSuccess('Profile picture removed successfully');
+    },
+  });
+}
+
