@@ -177,21 +177,27 @@ function convertToExcel(data, selectedColumns = [], config = {}) {
     // Set column definitions
     worksheet.columns = columnDefs;
 
-    // Add header row styling
-    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
-    worksheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: '176c07' } // Parrot green background
-    };
-    worksheet.getRow(1).alignment = { horizontal: 'center', vertical: 'middle' };
-    worksheet.getRow(1).border = {
-      top: { style: 'thin', color: { argb: 'FF000000' } },
-      bottom: { style: 'thin', color: { argb: 'FF000000' } },
-      left: { style: 'thin', color: { argb: 'FF000000' } },
-      right: { style: 'thin', color: { argb: 'FF000000' } }
-    };
-    worksheet.getRow(1).height = 20;
+    // Add header row styling - only for columns with data
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 20;
+    
+    // Style only header cells that have data (based on column count)
+    for (let colIndex = 1; colIndex <= columnDefs.length; colIndex++) {
+      const headerCell = headerRow.getCell(colIndex);
+      headerCell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      headerCell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF4472C4' } // Standard Excel blue-gray header color
+      };
+      headerCell.alignment = { horizontal: 'center', vertical: 'middle' };
+      headerCell.border = {
+        top: { style: 'thin', color: { argb: 'FF000000' } },
+        bottom: { style: 'thin', color: { argb: 'FF000000' } },
+        left: { style: 'thin', color: { argb: 'FF000000' } },
+        right: { style: 'thin', color: { argb: 'FF000000' } }
+      };
+    }
 
     // Add data rows
     filteredData.forEach((row, rowIndex) => {
@@ -249,6 +255,19 @@ export async function downloadPageData(pageKey, queryParams = {}, selectedColumn
       throw new Error('No data available to download');
     }
 
+    // Get filename from page title or fallback to pageKey
+    const getFileName = (extension) => {
+      const pageName = config?.title || pageKey;
+      // Sanitize filename: remove patterns like (_table_) and invalid characters
+      let sanitized = pageName
+        .replace(/\(_[^)]*_\)/g, '') // Remove patterns like (_table_), (_view_), etc.
+        .replace(/[<>:"/\\|?*]/g, '') // Remove invalid characters
+        .replace(/\s+/g, '_') // Replace spaces with underscores
+        .replace(/_+/g, '_') // Replace multiple underscores with single
+        .replace(/^_|_$/g, ''); // Remove leading/trailing underscores
+      return `${sanitized}.${extension}`;
+    };
+
     if (format === 'excel') {
       // Convert to Excel
       const excelBuffer = await convertToExcel(data, selectedColumns, config);
@@ -260,7 +279,7 @@ export async function downloadPageData(pageKey, queryParams = {}, selectedColumn
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${pageKey}.xlsx`;
+      link.download = getFileName('xlsx');
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -274,7 +293,7 @@ export async function downloadPageData(pageKey, queryParams = {}, selectedColumn
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${pageKey}.csv`;
+      link.download = getFileName('csv');
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
