@@ -1,7 +1,7 @@
 import { ProLayout } from '@ant-design/pro-layout';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { UserOutlined, LogoutOutlined, HomeOutlined, SettingOutlined } from '@ant-design/icons';
-import { Dropdown, Space, Button, theme } from 'antd';
+import { UserOutlined, LogoutOutlined, HomeOutlined, SettingOutlined, MailOutlined, PhoneOutlined } from '@ant-design/icons';
+import { Dropdown, Space, Button, theme, Typography } from 'antd';
 import useAuthStore from '../stores/authStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { logout as logoutApi } from '../api/auth';
@@ -63,14 +63,35 @@ export default function AppLayout({ children }) {
       })),
   ];
 
-  // User menu dropdown
+  const { Text } = Typography;
+
+  // User menu dropdown with detailed user information
   const userMenuItems = [
     {
       key: 'user-info',
       label: (
-        <Space>
-          <UserOutlined />
-          <span>{user?.username || 'User'}</span>
+        <Space direction="vertical" size="small" style={{ width: '100%', padding: '4px 0' }}>
+          <Space>
+            <UserOutlined />
+            <Text strong>{user?.name || user?.username || 'User'}</Text>
+          </Space>
+          {user?.email && (
+            <Space style={{ marginLeft: 20 }}>
+              <MailOutlined style={{ fontSize: 12 }} />
+              <Text type="secondary" style={{ fontSize: 12 }}>{user.email}</Text>
+            </Space>
+          )}
+          {user?.phone_number && (
+            <Space style={{ marginLeft: 20 }}>
+              <PhoneOutlined style={{ fontSize: 12 }} />
+              <Text type="secondary" style={{ fontSize: 12 }}>{user.phone_number}</Text>
+            </Space>
+          )}
+          {!user?.name && user?.username && (
+            <Text type="secondary" style={{ fontSize: 12, marginLeft: 20 }}>
+              @{user.username}
+            </Text>
+          )}
         </Space>
       ),
       disabled: true,
@@ -107,7 +128,7 @@ export default function AppLayout({ children }) {
       }}
       avatarProps={{
         src: null,
-        title: user?.username || 'User',
+        title: user?.name || user?.username || 'User',
         icon: <UserOutlined />,
         size: 'small',
         render: (props, dom) => {

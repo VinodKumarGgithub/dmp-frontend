@@ -16,6 +16,8 @@ import {
   Breadcrumb,
   Tooltip,
   Alert,
+  Drawer,
+  Descriptions,
 } from 'antd';
 import {
   PlusOutlined,
@@ -25,6 +27,10 @@ import {
   LockOutlined,
   HomeOutlined,
   InfoCircleOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  MoreOutlined,
+  UnlockOutlined,
 } from '@ant-design/icons';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '../api/users';
 import { useBlockUser, useUnblockUser } from '../api/admin';
@@ -33,7 +39,7 @@ import { usePages } from '../api/pages';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 
 export default function UserManagement() {
   const { token } = antdTheme.useToken();
@@ -47,6 +53,8 @@ export default function UserManagement() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [blockingUser, setBlockingUser] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
@@ -86,6 +94,9 @@ export default function UserManagement() {
     setEditingUser(user);
     form.setFieldsValue({
       username: user.username,
+      name: user.name,
+      email: user.email,
+      phone_number: user.phone_number,
       role: user.role,
       tenantIds: user.tenant_permissions || [],
       pageKeys: user.page_permissions || [],
@@ -134,13 +145,16 @@ export default function UserManagement() {
       if (editingUser) {
         const hasPasswordChange = Boolean(values.password);
         const hasRoleChange = values.role && values.role !== editingUser.role;
+        const hasNameChange = values.name !== editingUser.name;
+        const hasEmailChange = values.email !== editingUser.email;
+        const hasPhoneChange = values.phone_number !== editingUser.phone_number;
         const hasTenantChange =
           JSON.stringify(values.tenantIds || []) !== JSON.stringify(editingUser.tenant_permissions || []);
         const hasPageChange =
           JSON.stringify(values.pageKeys || []) !== JSON.stringify(editingUser.page_permissions || []);
 
-        if (!hasPasswordChange && !hasRoleChange && !hasTenantChange && !hasPageChange) {
-          message.warning('Please update password, role, or permissions before saving');
+        if (!hasPasswordChange && !hasRoleChange && !hasNameChange && !hasEmailChange && !hasPhoneChange && !hasTenantChange && !hasPageChange) {
+          message.warning('Please update at least one field before saving');
           return;
         }
 
@@ -152,6 +166,15 @@ export default function UserManagement() {
 
         if (values.password) {
           updateData.password = values.password;
+        }
+        if (hasNameChange) {
+          updateData.name = values.name || null;
+        }
+        if (hasEmailChange) {
+          updateData.email = values.email || null;
+        }
+        if (hasPhoneChange) {
+          updateData.phone_number = values.phone_number || null;
         }
 
         await updateMutation.mutateAsync({
@@ -166,6 +189,9 @@ export default function UserManagement() {
         await createMutation.mutateAsync({
           username: values.username,
           password: values.password,
+          name: values.name || null,
+          email: values.email || null,
+          phone_number: values.phone_number || null,
           role: values.role || 'USER',
           tenantIds: values.tenantIds || [],
           pageKeys: values.pageKeys || [],
@@ -178,34 +204,34 @@ export default function UserManagement() {
     }
   };
 
+  const handleViewMore = (user) => {
+    setSelectedUser(user);
+    setIsDrawerOpen(true);
+  };
+
+  const handleCloseDrawer = () => {
+    setIsDrawerOpen(false);
+    setSelectedUser(null);
+  };
+
   const columns = [
     {
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
-      width: 80,
+      width: 70,
+      fixed: 'left',
     },
     {
       title: 'Username',
       dataIndex: 'username',
       key: 'username',
-    },
-    {
-      title: 'Role',
-      dataIndex: 'role',
-      key: 'role',
-      render: (role) => {
-        const colorMap = {
-          ADMIN: 'red',
-          MANAGER: 'orange',
-          USER: 'blue',
-        };
-        return <Tag color={colorMap[role] || 'default'}>{role}</Tag>;
-      },
+      width: 150,
     },
     {
       title: 'Status',
       key: 'status',
+      width: 100,
       render: (_, record) => {
         if (record.is_blocked) {
           return (
@@ -220,68 +246,89 @@ export default function UserManagement() {
       },
     },
     {
-      title: 'Created On',
-      dataIndex: 'createdon',
-      key: 'createdon',
-      render: (date) => (date ? new Date(date).toLocaleDateString() : '-'),
+      title: 'Role',
+      dataIndex: 'role',
+      key: 'role',
+      width: 120,
+      render: (role) => {
+        const colorMap = {
+          ADMIN: 'red',
+          MANAGER: 'orange',
+          DEVELOPER: 'geekblue',
+          USER: 'blue',
+        };
+        return <Tag color={colorMap[role] || 'default'}>{role}</Tag>;
+      },
     },
     {
-      title: 'Tenants',
+      title: 'Tenant Access',
       dataIndex: 'tenant_permissions',
       key: 'tenant_permissions',
+      width: 150,
       render: (tenantPermissions = [], record) => {
-        if ((record.role === 'ADMIN' || record.role === 'MANAGER') && tenantPermissions.length === 0) {
-          return <Tag color="green">All Tenants</Tag>;
+        if ((record.role === 'ADMIN' || record.role === 'MANAGER' || record.role === 'DEVELOPER') && tenantPermissions.length === 0) {
+          return <Tag color="green">All</Tag>;
         }
         if (!tenantPermissions || tenantPermissions.length === 0) {
           return <Tag color="default">None</Tag>;
         }
-        const display = tenantPermissions.slice(0, 3);
         return (
-          <Space size={[4, 4]} wrap>
-            {display.map((tenantId) => (
-              <Tag key={`${record.id}-${tenantId}`} color="geekblue">
-                {tenantId}
-              </Tag>
-            ))}
-            {tenantPermissions.length > display.length && <Tag>+{tenantPermissions.length - display.length}</Tag>}
-          </Space>
+          <Tooltip title={tenantPermissions.join(', ')}>
+            <Tag color="geekblue">
+              {tenantPermissions.length} tenant{tenantPermissions.length > 1 ? 's' : ''}
+            </Tag>
+          </Tooltip>
         );
       },
     },
     {
-      title: 'Pages',
+      title: 'Page Access',
       dataIndex: 'page_permissions',
       key: 'page_permissions',
+      width: 150,
       render: (pagePermissions = []) => {
         if (!pagePermissions || pagePermissions.length === 0) {
-          return <Tag color="green">All Pages</Tag>;
+          return <Tag color="green">All</Tag>;
         }
-        const display = pagePermissions.slice(0, 3);
         return (
-          <Space size={[4, 4]} wrap>
-            {display.map((pageKey) => (
-              <Tag key={pageKey} color="purple">
-                {pageKey}
-              </Tag>
-            ))}
-            {pagePermissions.length > display.length && <Tag>+{pagePermissions.length - display.length}</Tag>}
-          </Space>
+          <Tooltip title={pagePermissions.join(', ')}>
+            <Tag color="purple">
+              {pagePermissions.length} page{pagePermissions.length > 1 ? 's' : ''}
+            </Tag>
+          </Tooltip>
         );
       },
+    },
+    {
+      title: 'More',
+      key: 'more',
+      width: 80,
+      fixed: 'right',
+      render: (_, record) => (
+        <Tooltip title="View Details">
+          <Button
+            type="link"
+            icon={<MoreOutlined />}
+            onClick={() => handleViewMore(record)}
+            style={{ color: token.colorPrimary }}
+          />
+        </Tooltip>
+      ),
     },
     {
       title: 'Actions',
       key: 'actions',
+      width: 120,
+      fixed: 'right',
       render: (_, record) => (
         <Space>
-          <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-          >
-            Edit
-          </Button>
+          <Tooltip title="Edit User">
+            <Button
+              type="link"
+              icon={<EditOutlined />}
+              onClick={() => handleEdit(record)}
+            />
+          </Tooltip>
           {record.username !== currentUser?.username && record.role !== 'ADMIN' && (
             <>
               {record.is_blocked ? (
@@ -292,22 +339,22 @@ export default function UserManagement() {
                   okText="Yes"
                   cancelText="No"
                 >
-                  <Button
-                    type="link"
-                    icon={<LockOutlined />}
-                  >
-                    Unblock
-                  </Button>
+                  <Tooltip title="Unblock User">
+                    <Button
+                      type="link"
+                      icon={<UnlockOutlined />}
+                    />
+                  </Tooltip>
                 </Popconfirm>
               ) : (
-                <Button
-                  type="link"
-                  danger
-                  icon={<LockOutlined />}
-                  onClick={() => handleBlock(record)}
-                >
-                  Block
-                </Button>
+                <Tooltip title="Block User">
+                  <Button
+                    type="link"
+                    danger
+                    icon={<LockOutlined />}
+                    onClick={() => handleBlock(record)}
+                  />
+                </Tooltip>
               )}
               <Popconfirm
                 title="Delete user"
@@ -316,13 +363,13 @@ export default function UserManagement() {
                 okText="Yes"
                 cancelText="No"
               >
-                <Button
-                  type="link"
-                  danger
-                  icon={<DeleteOutlined />}
-                >
-                  Delete
-                </Button>
+                <Tooltip title="Delete User">
+                  <Button
+                    type="link"
+                    danger
+                    icon={<DeleteOutlined />}
+                  />
+                </Tooltip>
               </Popconfirm>
             </>
           )}
@@ -375,7 +422,12 @@ export default function UserManagement() {
           dataSource={users}
           rowKey="id"
           loading={isLoading}
-          pagination={{ pageSize: 10 }}
+          scroll={{ x: 1000 }}
+          pagination={{ 
+            pageSize: 10,
+            showSizeChanger: true,
+            showTotal: (total) => `Total ${total} users`,
+          }}
           onRow={(record) => {
             if (record.is_blocked) {
               // Use theme tokens for blocked user row styling
@@ -433,6 +485,37 @@ export default function UserManagement() {
               placeholder="Enter username"
               disabled={!!editingUser}
             />
+          </Form.Item>
+
+          <Form.Item
+            name="name"
+            label="Full Name"
+            rules={[
+              { max: 100, message: 'Name must be less than 100 characters' },
+            ]}
+          >
+            <Input placeholder="Enter full name" />
+          </Form.Item>
+
+          <Form.Item
+            name="email"
+            label="Email"
+            rules={[
+              { type: 'email', message: 'Please enter a valid email address' },
+              { max: 255, message: 'Email must be less than 255 characters' },
+            ]}
+          >
+            <Input placeholder="Enter email address" />
+          </Form.Item>
+
+          <Form.Item
+            name="phone_number"
+            label="Phone Number"
+            rules={[
+              { max: 20, message: 'Phone number must be less than 20 characters' },
+            ]}
+          >
+            <Input placeholder="Enter phone number" />
           </Form.Item>
 
           <Form.Item
@@ -596,6 +679,135 @@ export default function UserManagement() {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/* Drawer for showing user details */}
+      <Drawer
+        title="User Details"
+        placement="right"
+        onClose={handleCloseDrawer}
+        open={isDrawerOpen}
+        width={600}
+      >
+        {selectedUser && (
+          <Descriptions
+            bordered
+            column={1}
+            size="small"
+            labelStyle={{
+              fontWeight: token.fontWeightStrong,
+              width: '40%',
+              background: token.colorFillAlter,
+            }}
+            contentStyle={{
+              background: token.colorBgContainer,
+            }}
+          >
+            <Descriptions.Item label="ID">
+              {selectedUser.id}
+            </Descriptions.Item>
+            <Descriptions.Item label="Username">
+              {selectedUser.username}
+            </Descriptions.Item>
+            <Descriptions.Item label="Full Name">
+              {selectedUser.name || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Email">
+              {selectedUser.email ? (
+                <Space>
+                  <MailOutlined />
+                  <span>{selectedUser.email}</span>
+                </Space>
+              ) : (
+                '-'
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="Phone Number">
+              {selectedUser.phone_number ? (
+                <Space>
+                  <PhoneOutlined />
+                  <span>{selectedUser.phone_number}</span>
+                </Space>
+              ) : (
+                '-'
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="Role">
+              <Tag color={
+                selectedUser.role === 'ADMIN' ? 'red' :
+                selectedUser.role === 'MANAGER' ? 'orange' :
+                selectedUser.role === 'DEVELOPER' ? 'geekblue' :
+                'blue'
+              }>
+                {selectedUser.role}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="Status">
+              {selectedUser.is_blocked ? (
+                <Space direction="vertical" size={4}>
+                  <Tag color="red" icon={<LockOutlined />}>
+                    Blocked
+                  </Tag>
+                  {selectedUser.blocked_reason && (
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Reason: {selectedUser.blocked_reason}
+                    </Text>
+                  )}
+                  {selectedUser.blocked_at && (
+                    <Text type="secondary" style={{ fontSize: 12 }}>
+                      Blocked on: {new Date(selectedUser.blocked_at).toLocaleString()}
+                    </Text>
+                  )}
+                </Space>
+              ) : (
+                <Tag color="green">Active</Tag>
+              )}
+            </Descriptions.Item>
+            <Descriptions.Item label="Tenant Access">
+              {(() => {
+                const tenantPermissions = selectedUser.tenant_permissions || [];
+                if ((selectedUser.role === 'ADMIN' || selectedUser.role === 'MANAGER' || selectedUser.role === 'DEVELOPER') && tenantPermissions.length === 0) {
+                  return <Tag color="green">All Tenants</Tag>;
+                }
+                if (tenantPermissions.length === 0) {
+                  return <Tag color="default">None</Tag>;
+                }
+                return (
+                  <Space size={[4, 4]} wrap>
+                    {tenantPermissions.map((tenantId) => (
+                      <Tag key={tenantId} color="geekblue">
+                        {tenantId}
+                      </Tag>
+                    ))}
+                  </Space>
+                );
+              })()}
+            </Descriptions.Item>
+            <Descriptions.Item label="Page Access">
+              {(() => {
+                const pagePermissions = selectedUser.page_permissions || [];
+                if (pagePermissions.length === 0) {
+                  return <Tag color="green">All Pages</Tag>;
+                }
+                return (
+                  <Space size={[4, 4]} wrap>
+                    {pagePermissions.map((pageKey) => (
+                      <Tag key={pageKey} color="purple">
+                        {pageKey}
+                      </Tag>
+                    ))}
+                  </Space>
+                );
+              })()}
+            </Descriptions.Item>
+            <Descriptions.Item label="Created On">
+              {selectedUser.createdon ? new Date(selectedUser.createdon).toLocaleString() : '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="Last Updated">
+              {selectedUser.updatedon ? new Date(selectedUser.updatedon).toLocaleString() : '-'}
+            </Descriptions.Item>
+          </Descriptions>
+        )}
+      </Drawer>
     </div>
   );
 }

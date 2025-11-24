@@ -126,7 +126,7 @@ function AppWithProviders() {
         <ThemeConfigWrapper>
           <AntdApp>
             <AuthProvider>
-              <App />
+      <App />
             </AuthProvider>
           </AntdApp>
         </ThemeConfigWrapper>
