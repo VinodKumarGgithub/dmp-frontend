@@ -180,14 +180,24 @@ export default function ProfilePage() {
         <Row gutter={[24, 24]} align="middle">
           <Col xs={24} sm={24} md={6}>
             <div style={{ textAlign: 'center' }}>
-              <Badge
-                count={profile?.role}
-                offset={[-10, 80]}
+              <div
                 style={{
-                  backgroundColor: token.colorPrimary,
+                  position: 'relative',
+                  display: 'inline-block',
+                  cursor: 'pointer',
                 }}
+                className="profile-avatar-container"
               >
-                <div style={{ position: 'relative', display: 'inline-block' }}>
+                {/* Avatar with bottom gradient shadow */}
+                <div
+                  style={{
+                    position: 'relative',
+                    display: 'inline-block',
+                    borderRadius: '50%',
+                    overflow: 'hidden',
+                    zIndex: 1,
+                  }}
+                >
                   <Avatar
                     size={120}
                     src={getUserAvatarUrl(profile, 240)}
@@ -195,10 +205,47 @@ export default function ProfilePage() {
                     style={{
                       backgroundColor: token.colorPrimary,
                       fontSize: 48,
-                      border: `4px solid ${token.colorBgContainer}`,
-                      boxShadow: token.boxShadow,
+                      border: 'none',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      display: 'block',
                     }}
                   />
+                  
+                  {/* Black gradient shadow at bottom only */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: '40%',
+                      background: `linear-gradient(to top, 
+                        rgba(0, 0, 0, 0.6) 0%, 
+                        rgba(0, 0, 0, 0.4) 30%, 
+                        rgba(0, 0, 0, 0.2) 60%, 
+                        rgba(0, 0, 0, 0.05) 85%, 
+                        transparent 100%)`,
+                      borderRadius: '50%',
+                      pointerEvents: 'none',
+                      zIndex: 2,
+                    }}
+                  />
+                </div>
+                
+                {/* Upload button - visible on hover */}
+                <div
+                  className="profile-avatar-actions"
+                  style={{
+                    position: 'absolute',
+                    bottom: 6,
+                    right: 6,
+                    opacity: 0,
+                    transition: 'all 0.3s ease',
+                    zIndex: 5,
+                    transform: 'translateY(4px)',
+                  }}
+                >
                   <Upload
                     showUploadList={false}
                     beforeUpload={(file) => {
@@ -239,14 +286,27 @@ export default function ProfilePage() {
                       icon={<CameraOutlined />}
                       size="small"
                       style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        right: 0,
-                        boxShadow: token.boxShadow,
+                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
+                        border: '2px solid rgba(255, 255, 255, 0.3)',
                       }}
                     />
                   </Upload>
-                  {profile?.profile_picture && (
+                </div>
+                
+                {/* Delete button - visible on hover */}
+                {profile?.profile_picture && (
+                  <div
+                    className="profile-avatar-actions"
+                    style={{
+                      position: 'absolute',
+                      bottom: 6,
+                      left: 6,
+                      opacity: 0,
+                      transition: 'all 0.3s ease',
+                      zIndex: 5,
+                      transform: 'translateY(4px)',
+                    }}
+                  >
                     <Popconfirm
                       title="Remove profile picture?"
                       description="Are you sure you want to remove your profile picture?"
@@ -270,16 +330,26 @@ export default function ProfilePage() {
                         icon={<DeleteOutlined />}
                         size="small"
                         style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          boxShadow: token.boxShadow,
+                          boxShadow: '0 4px 12px rgba(255, 77, 79, 0.35)',
+                          border: '2px solid rgba(255, 255, 255, 0.3)',
                         }}
                       />
                     </Popconfirm>
-                  )}
-                </div>
-              </Badge>
+                  </div>
+                )}
+              </div>
+              <style>{`
+                .profile-avatar-container {
+                  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                }
+                .profile-avatar-container:hover {
+                  transform: scale(1.03);
+                }
+                .profile-avatar-container:hover .profile-avatar-actions {
+                  opacity: 1 !important;
+                  transform: translateY(0) !important;
+                }
+              `}</style>
               <div style={{ marginTop: token.marginMD }}>
                 <Text type="secondary" style={{ fontSize: 12 }}>
                   {profile?.profile_picture ? 'Click camera to change' : 'Click camera to upload'}
