@@ -27,6 +27,7 @@ import {
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '../api/users';
+import { useBlockUser, useUnblockUser } from '../api/admin';
 import { useTenants } from '../api/tenants';
 import { usePages } from '../api/pages';
 import { useAuth } from '../contexts/AuthContext';
@@ -41,10 +42,15 @@ export default function UserManagement() {
   const createMutation = useCreateUser();
   const updateMutation = useUpdateUser();
   const deleteMutation = useDeleteUser();
+  const blockMutation = useBlockUser();
+  const unblockMutation = useUnblockUser();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBlockModalOpen, setIsBlockModalOpen] = useState(false);
+  const [blockingUser, setBlockingUser] = useState(null);
   const [editingUser, setEditingUser] = useState(null);
   const [form] = Form.useForm();
+  const [blockForm] = Form.useForm();
   const roleWatch = Form.useWatch('role', form);
 
   const users = usersData?.data || (Array.isArray(usersData) ? usersData : []);
@@ -90,6 +96,34 @@ export default function UserManagement() {
   const handleDelete = async (userId) => {
     try {
       await deleteMutation.mutateAsync(userId);
+    } catch (error) {
+      // Error already handled by mutation
+    }
+  };
+
+  const handleBlock = (user) => {
+    setBlockingUser(user);
+    blockForm.resetFields();
+    setIsBlockModalOpen(true);
+  };
+
+  const handleUnblock = async (userId) => {
+    try {
+      await unblockMutation.mutateAsync(userId);
+    } catch (error) {
+      // Error already handled by mutation
+    }
+  };
+
+  const handleBlockSubmit = async (values) => {
+    try {
+      await blockMutation.mutateAsync({
+        userId: blockingUser.id,
+        reason: values.reason,
+      });
+      setIsBlockModalOpen(false);
+      blockForm.resetFields();
+      setBlockingUser(null);
     } catch (error) {
       // Error already handled by mutation
     }
@@ -170,9 +204,25 @@ export default function UserManagement() {
       },
     },
     {
-      title: 'Created At',
-      dataIndex: 'created_at',
-      key: 'created_at',
+      title: 'Status',
+      key: 'status',
+      render: (_, record) => {
+        if (record.is_blocked) {
+          return (
+            <Tooltip title={record.blocked_reason || 'User is blocked'}>
+              <Tag color="red" icon={<LockOutlined />}>
+                Blocked
+              </Tag>
+            </Tooltip>
+          );
+        }
+        return <Tag color="green">Active</Tag>;
+      },
+    },
+    {
+      title: 'Created On',
+      dataIndex: 'createdon',
+      key: 'createdon',
       render: (date) => (date ? new Date(date).toLocaleDateString() : '-'),
     },
     {
@@ -230,24 +280,51 @@ export default function UserManagement() {
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
           >
-            Change Password
+            Edit
           </Button>
-          {record.username !== currentUser?.username && (
-            <Popconfirm
-              title="Delete user"
-              description={`Are you sure you want to delete user "${record.username}"?`}
-              onConfirm={() => handleDelete(record.id)}
-              okText="Yes"
-              cancelText="No"
-            >
-              <Button
-                type="link"
-                danger
-                icon={<DeleteOutlined />}
+          {record.username !== currentUser?.username && record.role !== 'ADMIN' && (
+            <>
+              {record.is_blocked ? (
+                <Popconfirm
+                  title="Unblock user"
+                  description={`Are you sure you want to unblock user "${record.username}"?`}
+                  onConfirm={() => handleUnblock(record.id)}
+                  okText="Yes"
+                  cancelText="No"
+                >
+                  <Button
+                    type="link"
+                    icon={<LockOutlined />}
+                  >
+                    Unblock
+                  </Button>
+                </Popconfirm>
+              ) : (
+                <Button
+                  type="link"
+                  danger
+                  icon={<LockOutlined />}
+                  onClick={() => handleBlock(record)}
+                >
+                  Block
+                </Button>
+              )}
+              <Popconfirm
+                title="Delete user"
+                description={`Are you sure you want to delete user "${record.username}"?`}
+                onConfirm={() => handleDelete(record.id)}
+                okText="Yes"
+                cancelText="No"
               >
-                Delete
-              </Button>
-            </Popconfirm>
+                <Button
+                  type="link"
+                  danger
+                  icon={<DeleteOutlined />}
+                >
+                  Delete
+                </Button>
+              </Popconfirm>
+            </>
           )}
         </Space>
       ),
@@ -299,6 +376,28 @@ export default function UserManagement() {
           rowKey="id"
           loading={isLoading}
           pagination={{ pageSize: 10 }}
+          onRow={(record) => {
+            if (record.is_blocked) {
+              // Use theme tokens for blocked user row styling
+              // colorFillTertiary provides a subtle background that adapts to theme
+              // For error state, we use a slightly more prominent fill
+              return {
+                style: {
+                  backgroundColor: token.colorFillTertiary || token.colorBgContainer,
+                  opacity: 0.85,
+                },
+                onMouseEnter: (e) => {
+                  e.currentTarget.style.backgroundColor = token.colorFillSecondary || token.colorFillTertiary;
+                  e.currentTarget.style.opacity = '1';
+                },
+                onMouseLeave: (e) => {
+                  e.currentTarget.style.backgroundColor = token.colorFillTertiary || token.colorBgContainer;
+                  e.currentTarget.style.opacity = '0.85';
+                },
+              };
+            }
+            return {};
+          }}
         />
       </Card>
 
@@ -453,6 +552,47 @@ export default function UserManagement() {
               </Form.Item>
             </>
           )}
+        </Form>
+      </Modal>
+
+      <Modal
+        title={`Block User: ${blockingUser?.username}`}
+        open={isBlockModalOpen}
+        onCancel={() => {
+          setIsBlockModalOpen(false);
+          blockForm.resetFields();
+          setBlockingUser(null);
+        }}
+        onOk={() => blockForm.submit()}
+        confirmLoading={blockMutation.isPending}
+        okText="Block User"
+        cancelText="Cancel"
+      >
+        <Form
+          form={blockForm}
+          layout="vertical"
+          onFinish={handleBlockSubmit}
+        >
+          <Alert
+            message="Warning"
+            description="Blocking a user will prevent them from accessing the system. They will not be able to log in until unblocked."
+            type="warning"
+            showIcon
+            style={{ marginBottom: token.marginMD }}
+          />
+          <Form.Item
+            name="reason"
+            label="Block Reason"
+            rules={[
+              { required: true, message: 'Please provide a reason for blocking this user' },
+              { min: 10, message: 'Reason must be at least 10 characters' },
+            ]}
+          >
+            <Input.TextArea
+              rows={4}
+              placeholder="Enter the reason for blocking this user (e.g., Security violation, Policy violation, etc.)"
+            />
+          </Form.Item>
         </Form>
       </Modal>
     </div>

@@ -7,25 +7,65 @@ import { message as antdMessage } from 'antd';
  * @param {boolean} options.showToast - Whether to show toast notification (default: true)
  * @param {string} options.defaultMessage - Default error message if none provided
  */
+/**
+ * Format error message (without code prefix)
+ * Shows: Message if message exists, otherwise uses details
+ */
+function formatErrorMessage(message, details) {
+  // Use message if available, otherwise use details
+  let displayMessage = message;
+  
+  if (!displayMessage && details) {
+    if (Array.isArray(details) && details.length > 0) {
+      displayMessage = details[0];
+    } else if (typeof details === 'string') {
+      displayMessage = details;
+    }
+  }
+  
+  // If still no message, use default
+  if (!displayMessage) {
+    displayMessage = 'An error occurred';
+  }
+  
+  return displayMessage;
+}
+
 export function handleApiError(error, options = {}) {
   const { showToast = true, defaultMessage = 'An error occurred' } = options;
 
-  const errorMessage =
+  const errorCode = error?.code || error?.error?.code || error?.response?.data?.error?.code;
+  const errorDetails = error?.details || error?.error?.details || error?.response?.data?.error?.details;
+  
+  // Get raw message (without code prefix)
+  const rawMessage =
     error?.message ||
     error?.error?.message ||
     error?.response?.data?.message ||
     error?.response?.data?.error?.message ||
-    defaultMessage;
+    null;
 
-  const errorCode = error?.code || error?.error?.code || error?.response?.data?.error?.code;
-  const errorDetails = error?.details || error?.error?.details || error?.response?.data?.error?.details;
+  // Format error message (without code), using details as fallback
+  const formattedMessage = formatErrorMessage(rawMessage, errorDetails);
+
+  // For USER_BLOCKED, show longer duration
+  const duration = errorCode === 'USER_BLOCKED' ? 6 : 4;
 
   if (showToast) {
-    antdMessage.error(errorMessage, 4);
+    if (errorCode === 'USER_BLOCKED') {
+      antdMessage.error({
+        content: formattedMessage,
+        duration: duration,
+        style: { marginTop: '20vh' },
+      });
+    } else {
+      antdMessage.error(formattedMessage, duration);
+    }
   }
 
   return {
-    message: errorMessage,
+    message: formattedMessage,
+    rawMessage: rawMessage,
     code: errorCode,
     details: errorDetails,
     originalError: error,

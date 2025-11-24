@@ -45,9 +45,26 @@ axiosInstance.interceptors.response.use(
   (error) => {
     // Handle error response
     const errorResponse = error.response?.data || {};
-    const errorMessage = errorResponse.message || errorResponse.error?.message || error.message || 'An error occurred';
     const errorCode = errorResponse.error?.code || errorResponse.code || 'INTERNAL_ERROR';
     const errorDetails = errorResponse.error?.details || errorResponse.details;
+    
+    // Get raw message (prefer message, fallback to details, then default)
+    const rawMessage = errorResponse.message || 
+                      errorResponse.error?.message || 
+                      error.message || 
+                      null;
+    
+    // Format error message (without code): Show message, or use details if message is not available
+    let formattedMessage;
+    if (rawMessage) {
+      formattedMessage = rawMessage;
+    } else if (errorDetails) {
+      formattedMessage = Array.isArray(errorDetails) && errorDetails.length > 0
+        ? errorDetails[0]
+        : (typeof errorDetails === 'string' ? errorDetails : 'An error occurred');
+    } else {
+      formattedMessage = 'An error occurred';
+    }
 
     // Check if error should skip toast (set in request config)
     const skipToast = error.config?.skipToast || false;
@@ -57,14 +74,16 @@ axiosInstance.interceptors.response.use(
     const isAuthError = error.config?.url?.includes('/auth/');
     
     if (!skipToast && !isAuthError) {
-      // Ant Design message.config({ maxCount: 1 }) will handle showing only one toast at a time
-      message.error(errorMessage, 4);
+      // Show formatted message with code
+      const duration = errorCode === 'USER_BLOCKED' ? 6 : 4;
+      message.error(formattedMessage, duration);
     }
 
     // Log error for debugging
     console.error('API Error:', {
       code: errorCode,
-      message: errorMessage,
+      message: rawMessage,
+      formattedMessage: formattedMessage,
       details: errorDetails,
       status: error.response?.status,
       url: error.config?.url,
@@ -73,7 +92,8 @@ axiosInstance.interceptors.response.use(
     // Return a consistent error format
     return Promise.reject({
       code: errorCode,
-      message: errorMessage,
+      message: rawMessage || formattedMessage, // Return raw message if available, otherwise formatted
+      formattedMessage: formattedMessage,
       details: errorDetails,
       status: error.response?.status || 500,
     });
