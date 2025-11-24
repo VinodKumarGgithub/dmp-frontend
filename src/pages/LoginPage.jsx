@@ -4,6 +4,7 @@ import { UserOutlined, LockOutlined, SafetyOutlined, DatabaseOutlined, Thunderbo
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import useAppConfigStore from '../stores/appConfigStore';
 
 const { Title, Text } = Typography;
 
@@ -14,6 +15,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { token } = theme.useToken();
   const { isDark } = useTheme();
+  const getAppName = useAppConfigStore((state) => state.getAppName);
   
   // Calculate glassy colors based on theme - premium glassmorphism for both modes
   const glassBg = isDark 
@@ -56,11 +58,13 @@ export default function LoginPage() {
     setLoading(true);
     try {
       await login(values.username, values.password);
+      // Small delay to ensure state is updated before navigation
+      // The LoadingScreen will show in App.jsx while pages are loading
+      await new Promise(resolve => setTimeout(resolve, 100));
       navigate('/');
     } catch (error) {
       // Error is already handled by login function via handleApiError
       console.error('Login failed:', error);
-    } finally {
       setLoading(false);
     }
   };
@@ -191,7 +195,7 @@ export default function LoginPage() {
                     fontSize: '2.5rem',
                   }}
                 >
-                  Clinical Manager
+                  {getAppName()}
                 </Title>
                 <Text
                   style={{

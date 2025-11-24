@@ -48,12 +48,21 @@ export function AuthProvider({ children }) {
 
   // Sync pages config to store
   useEffect(() => {
+    // Always update loading state to ensure it's in sync
     setPagesLoading(pagesLoading);
+    
     if (pagesData) {
       const pagesConfig = pagesData?.data || (Array.isArray(pagesData) ? pagesData : []);
       setPagesConfig(pagesConfig);
+      // Ensure loading is set to false when data is received
+      if (pagesLoading === false) {
+        setPagesLoading(false);
+      }
+    } else if (pagesLoading === false && user) {
+      // If query is done but no data, ensure loading is false
+      setPagesLoading(false);
     }
-  }, [pagesData, pagesLoading, setPagesConfig, setPagesLoading]);
+  }, [pagesData, pagesLoading, setPagesConfig, setPagesLoading, user]);
 
   // Wrapper functions that use the store
   const login = async (username, password) => {
@@ -76,7 +85,7 @@ export function useAuth() {
   return {
     user: store.user,
     isAuthenticated: store.isAuthenticated(),
-    loading: false, // Zustand persist handles loading
+    loading: false, // Zustand persist handles loading synchronously, no initial loading needed
     login: async (username, password) => {
       return store.login(username, password, loginApi, queryClient);
     },

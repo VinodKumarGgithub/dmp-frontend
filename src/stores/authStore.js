@@ -32,7 +32,7 @@ const useAuthStore = create(
             role: payload.role,
           };
           
-          set({ user: userData });
+          set({ user: userData, pagesLoading: true });
           
           // Invalidate and refetch pages config immediately after login
           if (queryClient) {
@@ -42,6 +42,7 @@ const useAuthStore = create(
           
           return result;
         } catch (error) {
+          set({ pagesLoading: false });
           throw error;
         }
       },

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import App from './App.jsx';
 import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -7,6 +7,7 @@ import enUS from 'antd/locale/en_US';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { handleApiError } from './utils/errorHandler';
+import LoadingScreen from './components/LoadingScreen';
 import 'antd/dist/reset.css';
 
 // Configure Ant Design message to show only one toast at a time
@@ -76,18 +77,66 @@ function ThemeConfigWrapper({ children }) {
   );
 }
 
-createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
+function AppWithProviders() {
+  const [initialLoading, setInitialLoading] = useState(true);
+  const mountTimeRef = useRef(Date.now());
+
+  useEffect(() => {
+    // Track mount time
+    mountTimeRef.current = Date.now();
+
+    // Minimum display time: 2 seconds - ensure loading screen shows for at least 2 seconds
+    const minDisplayTimer = setTimeout(() => {
+      const elapsed = Date.now() - mountTimeRef.current;
+      // Only hide if at least 2 seconds have passed
+      if (elapsed >= 2000) {
+        setInitialLoading(false);
+      } else {
+        // If somehow less than 2 seconds, wait for the remainder
+        const remaining = 2000 - elapsed;
+        setTimeout(() => {
+          setInitialLoading(false);
+        }, remaining);
+      }
+    }, 2000);
+
+    return () => {
+      clearTimeout(minDisplayTimer);
+    };
+  }, []);
+
+  // Show initial loading screen for at least 2 seconds
+  if (initialLoading) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <ThemeConfigWrapper>
+            <AntdApp>
+              <LoadingScreen isLoading={true} />
+            </AntdApp>
+          </ThemeConfigWrapper>
+        </ThemeProvider>
+      </QueryClientProvider>
+    );
+  }
+
+  return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <ThemeConfigWrapper>
           <AntdApp>
             <AuthProvider>
-      <App />
+              <App />
             </AuthProvider>
           </AntdApp>
         </ThemeConfigWrapper>
       </ThemeProvider>
     </QueryClientProvider>
+  );
+}
+
+createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <AppWithProviders />
   </React.StrictMode>
 );

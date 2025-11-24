@@ -2,26 +2,20 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import AppLayout from './layout/AppLayout';
 import { routes, publicRoutes } from './config/routes';
 import { useAuth } from './contexts/AuthContext';
-import { Spin } from 'antd';
+import LoadingScreen from './components/LoadingScreen';
 
 function AppContent() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, pagesLoading } = useAuth();
   const location = useLocation();
 
-  // Show loading while checking auth
-  if (loading) {
-    return (
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-        }}
-      >
-        <Spin size="large" />
-      </div>
-    );
+  // Determine if we should show loading screen
+  // Only show loading if pages are actually loading (not just initial state)
+  const showLoading = loading || (isAuthenticated && pagesLoading === true && location.pathname !== '/login');
+
+  // Show loading while checking auth or loading pages
+  if (showLoading) {
+    // Use key to force remount and reset progress when loading state changes
+    return <LoadingScreen key="loading" isLoading={true} />;
   }
 
   // Check if current route is public

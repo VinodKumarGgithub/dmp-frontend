@@ -9,6 +9,7 @@ import TenantSelector from '../components/TenantSelector';
 import ThemeToggle from '../components/ThemeToggle';
 import PageSwitcher from '../components/PageSwitcher';
 import { protectedRoutes } from '../config/routes';
+import useAppConfigStore from '../stores/appConfigStore';
 
 export default function AppLayout({ children }) {
   const navigate = useNavigate();
@@ -18,6 +19,8 @@ export default function AppLayout({ children }) {
   const logout = useAuthStore((state) => state.logout);
   const queryClient = useQueryClient();
   const { token } = theme.useToken();
+  const getAppName = useAppConfigStore((state) => state.getAppName);
+  const getAppShortName = useAppConfigStore((state) => state.getAppShortName);
 
   const handleLogout = () => {
     logout(logoutApi, queryClient);
@@ -89,8 +92,8 @@ export default function AppLayout({ children }) {
 
   return (
     <ProLayout
-      title="Clinical Manager"
-      logo={<div style={{ color: token.colorText, fontWeight: token.fontWeightStrong }}>CM</div>}
+      title={getAppName()}
+      logo={<div style={{ color: token.colorText, fontWeight: token.fontWeightStrong }}>{getAppShortName()}</div>}
       location={{
         pathname: location.pathname,
       }}
