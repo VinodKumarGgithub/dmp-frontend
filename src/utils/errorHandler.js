@@ -48,11 +48,11 @@ export function handleApiError(error, options = {}) {
   // Format error message (without code), using details as fallback
   const formattedMessage = formatErrorMessage(rawMessage, errorDetails);
 
-  // For USER_BLOCKED, show longer duration
-  const duration = errorCode === 'USER_BLOCKED' ? 6 : 4;
+  // For USER_BLOCKED and DANGEROUS_SQL_DETECTED, show longer duration
+  const duration = (errorCode === 'USER_BLOCKED' || errorCode === 'DANGEROUS_SQL_DETECTED') ? 6 : 4;
 
   if (showToast) {
-    if (errorCode === 'USER_BLOCKED') {
+    if (errorCode === 'USER_BLOCKED' || errorCode === 'DANGEROUS_SQL_DETECTED') {
       antdMessage.error({
         content: formattedMessage,
         duration: duration,

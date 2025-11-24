@@ -40,6 +40,10 @@ export default function AppLayout({ children }) {
         if (route.adminOnly && user?.role !== 'ADMIN') {
           return false;
         }
+        // Show developer routes to admin or developer users
+        if (route.developerOnly && user?.role !== 'ADMIN' && user?.role !== 'DEVELOPER') {
+          return false;
+        }
         return true;
       })
       .map((route) => ({

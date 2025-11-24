@@ -36,14 +36,19 @@ export default function ErrorDisplay({ error, config }) {
 
   const queryContext = error?.queryContext || error?.response?.data?.queryContext;
   const errorMessage = error?.message || error?.response?.data?.message || 'An error occurred';
-  const errorCode = error?.code || error?.response?.data?.code;
-  const errorDetails = error?.details || error?.response?.data?.details;
+  const errorCode = error?.code || error?.response?.data?.code || error?.response?.data?.error?.code;
+  const errorDetails = error?.details || error?.response?.data?.details || error?.response?.data?.error?.details;
 
   // Determine error category and icon
   const category = queryContext?.category || 'unknown';
   const errorType = queryContext?.type || 'UNKNOWN_ERROR';
   
   const getErrorTypeInfo = () => {
+    // Check for dangerous SQL error code first
+    if (errorCode === 'DANGEROUS_SQL_DETECTED') {
+      return { color: 'red', label: 'Dangerous SQL Detected', icon: <ExclamationCircleOutlined /> };
+    }
+    
     switch (errorType) {
       case 'SQL_SYNTAX_ERROR':
         return { color: 'red', label: 'SQL Syntax Error', icon: <ExclamationCircleOutlined /> };

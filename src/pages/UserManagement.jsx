@@ -444,6 +444,7 @@ export default function UserManagement() {
             <Select placeholder="Select role">
               <Select.Option value="ADMIN">Admin</Select.Option>
               <Select.Option value="MANAGER">Manager</Select.Option>
+              <Select.Option value="DEVELOPER">Developer</Select.Option>
               <Select.Option value="USER">User</Select.Option>
             </Select>
           </Form.Item>
