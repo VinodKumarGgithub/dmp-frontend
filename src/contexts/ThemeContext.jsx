@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { theme } from 'antd';
 import { usePreferences, useUpdatePreferences } from '../api/profile';
 import useAuthStore from '../stores/authStore';
@@ -13,6 +13,17 @@ export function ThemeProvider({ children }) {
   const { data: preferencesData } = usePreferences({ enabled: isAuthenticated });
   const preferences = preferencesData?.data || preferencesData || {};
   const updatePreferencesMutation = useUpdatePreferences();
+  
+  // Debounced preference update
+  const debounceTimerRef = useRef(null);
+  const debouncedUpdatePreferences = useCallback((prefs) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      updatePreferencesMutation.mutate(prefs);
+    }, 5000); // 5s debounce delay
+  }, [updatePreferencesMutation]);
 
   const [isDark, setIsDark] = useState(() => {
     // Check localStorage first, then system preference
@@ -57,7 +68,7 @@ export function ThemeProvider({ children }) {
   const toggleTheme = () => {
     const newIsDark = !isDark;
     setIsDark(newIsDark);
-    // Save to API only when user explicitly toggles theme
+    // Save to API only when user explicitly toggles theme (no debounce needed for explicit action)
     if (isAuthenticated) {
       updatePreferencesMutation.mutate({
         theme: newIsDark ? 'dark' : 'light',
@@ -66,6 +77,15 @@ export function ThemeProvider({ children }) {
       });
     }
   };
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const algorithm = isDark ? theme.darkAlgorithm : theme.defaultAlgorithm;
   const fontFamily = preferences?.fontFamily || DEFAULT_FONT;

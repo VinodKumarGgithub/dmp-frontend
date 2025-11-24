@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Card,
   Form,
@@ -88,6 +88,17 @@ export default function ProfilePage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
 
+  // Debounced preference update
+  const debounceTimerRef = useRef(null);
+  const debouncedUpdatePreferences = useCallback((prefs) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      updatePreferencesMutation.mutate(prefs);
+    }, 500); // 500ms debounce delay
+  }, [updatePreferencesMutation]);
+
   // Initialize forms when data loads
   useEffect(() => {
     if (profile) {
@@ -99,6 +110,15 @@ export default function ProfilePage() {
       });
     }
   }, [profile, profileForm]);
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   const handleProfileUpdate = async (values) => {
     try {
@@ -188,49 +208,121 @@ export default function ProfilePage() {
                 }}
                 className="profile-avatar-container"
               >
-                {/* Avatar with bottom gradient shadow */}
+                {/* Premium Background Circle - creates depth */}
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    width: '160px',
+                    height: '160px',
+                    borderRadius: '50%',
+                    background: `radial-gradient(circle, ${token.colorPrimary}15 0%, ${token.colorPrimary}08 40%, transparent 70%)`,
+                    filter: 'blur(20px)',
+                    zIndex: 0,
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                  }}
+                  className="profile-avatar-bg"
+                />
+                
+                {/* Premium Gradient Border Wrapper */}
                 <div
                   style={{
                     position: 'relative',
                     display: 'inline-block',
                     borderRadius: '50%',
-                    overflow: 'hidden',
+                    padding: '3px',
+                    background: `linear-gradient(135deg, ${token.colorPrimary}40 0%, ${token.colorPrimary}20 50%, rgba(255, 255, 255, 0.1) 100%)`,
+                    boxShadow: `
+                      0 0 0 1px rgba(255, 255, 255, 0.1) inset,
+                      0 8px 32px rgba(0, 0, 0, 0.12),
+                      0 4px 16px rgba(0, 0, 0, 0.08),
+                      0 0 40px ${token.colorPrimary}15
+                    `,
                     zIndex: 1,
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                   }}
+                  className="profile-avatar-border"
                 >
-                  <Avatar
-                    size={120}
-                    src={getUserAvatarUrl(profile, 240)}
-                    icon={<UserOutlined />}
-                    style={{
-                      backgroundColor: token.colorPrimary,
-                      fontSize: 48,
-                      border: 'none',
-                      position: 'relative',
-                      overflow: 'hidden',
-                      display: 'block',
-                    }}
-                  />
-                  
-                  {/* Black gradient shadow at bottom only */}
+                  {/* Avatar Container with Enhanced Shadows */}
                   <div
                     style={{
-                      position: 'absolute',
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      height: '40%',
-                      background: `linear-gradient(to top, 
-                        rgba(0, 0, 0, 0.6) 0%, 
-                        rgba(0, 0, 0, 0.4) 30%, 
-                        rgba(0, 0, 0, 0.2) 60%, 
-                        rgba(0, 0, 0, 0.05) 85%, 
-                        transparent 100%)`,
+                      position: 'relative',
+                      display: 'inline-block',
                       borderRadius: '50%',
-                      pointerEvents: 'none',
-                      zIndex: 2,
+                      overflow: 'hidden',
+                      boxShadow: `
+                        0 4px 20px rgba(0, 0, 0, 0.15),
+                        0 2px 8px rgba(0, 0, 0, 0.1),
+                        inset 0 1px 2px rgba(255, 255, 255, 0.1)
+                      `,
                     }}
-                  />
+                  >
+                    <Avatar
+                      size={120}
+                      src={getUserAvatarUrl(profile, 240)}
+                      icon={<UserOutlined />}
+                      style={{
+                        backgroundColor: token.colorPrimary,
+                        fontSize: 48,
+                        border: 'none',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        display: 'block',
+                      }}
+                    />
+                    
+                    {/* Vignette Effect - darker edges, lighter center */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        background: `radial-gradient(circle, transparent 30%, rgba(0, 0, 0, 0.2) 70%, rgba(0, 0, 0, 0.4) 100%)`,
+                        borderRadius: '50%',
+                        pointerEvents: 'none',
+                        zIndex: 2,
+                      }}
+                    />
+                    
+                    {/* Subtle Shine/Reflection at Top */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: '20%',
+                        right: '20%',
+                        height: '35%',
+                        background: `radial-gradient(ellipse, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.1) 40%, transparent 70%)`,
+                        borderRadius: '50%',
+                        pointerEvents: 'none',
+                        zIndex: 3,
+                      }}
+                    />
+                    
+                    {/* Black gradient shadow at bottom */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        height: '40%',
+                        background: `linear-gradient(to top, 
+                          rgba(0, 0, 0, 0.6) 0%, 
+                          rgba(0, 0, 0, 0.4) 30%, 
+                          rgba(0, 0, 0, 0.2) 60%, 
+                          rgba(0, 0, 0, 0.05) 85%, 
+                          transparent 100%)`,
+                        borderRadius: '50%',
+                        pointerEvents: 'none',
+                        zIndex: 4,
+                      }}
+                    />
+                  </div>
                 </div>
                 
                 {/* Upload button - visible on hover */}
@@ -238,12 +330,12 @@ export default function ProfilePage() {
                   className="profile-avatar-actions"
                   style={{
                     position: 'absolute',
-                    bottom: 6,
-                    right: 6,
+                    bottom: 8,
+                    right: 8,
                     opacity: 0,
-                    transition: 'all 0.3s ease',
-                    zIndex: 5,
-                    transform: 'translateY(4px)',
+                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    zIndex: 6,
+                    transform: 'translateY(4px) scale(0.9)',
                   }}
                 >
                   <Upload
@@ -286,8 +378,10 @@ export default function ProfilePage() {
                       icon={<CameraOutlined />}
                       size="small"
                       style={{
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.25)',
-                        border: '2px solid rgba(255, 255, 255, 0.3)',
+                        boxShadow: `0 4px 16px ${token.colorPrimary}50, 0 2px 8px rgba(0, 0, 0, 0.2)`,
+                        border: '2px solid rgba(255, 255, 255, 0.4)',
+                        backdropFilter: 'blur(10px)',
+                        WebkitBackdropFilter: 'blur(10px)',
                       }}
                     />
                   </Upload>
@@ -299,12 +393,12 @@ export default function ProfilePage() {
                     className="profile-avatar-actions"
                     style={{
                       position: 'absolute',
-                      bottom: 6,
-                      left: 6,
+                      bottom: 8,
+                      left: 8,
                       opacity: 0,
-                      transition: 'all 0.3s ease',
-                      zIndex: 5,
-                      transform: 'translateY(4px)',
+                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      zIndex: 6,
+                      transform: 'translateY(4px) scale(0.9)',
                     }}
                   >
                     <Popconfirm
@@ -330,8 +424,10 @@ export default function ProfilePage() {
                         icon={<DeleteOutlined />}
                         size="small"
                         style={{
-                          boxShadow: '0 4px 12px rgba(255, 77, 79, 0.35)',
-                          border: '2px solid rgba(255, 255, 255, 0.3)',
+                          boxShadow: '0 4px 16px rgba(255, 77, 79, 0.5), 0 2px 8px rgba(0, 0, 0, 0.2)',
+                          border: '2px solid rgba(255, 255, 255, 0.4)',
+                          backdropFilter: 'blur(10px)',
+                          WebkitBackdropFilter: 'blur(10px)',
                         }}
                       />
                     </Popconfirm>
@@ -339,15 +435,56 @@ export default function ProfilePage() {
                 )}
               </div>
               <style>{`
+                @keyframes profilePulse {
+                  0%, 100% {
+                    opacity: 1;
+                    transform: scale(1);
+                  }
+                  50% {
+                    opacity: 0.8;
+                    transform: scale(1.02);
+                  }
+                }
+                
+                @keyframes profileGlow {
+                  0%, 100% {
+                    box-shadow: 0 0 0 0 ${token.colorPrimary}40;
+                  }
+                  50% {
+                    box-shadow: 0 0 0 8px ${token.colorPrimary}00;
+                  }
+                }
+                
                 .profile-avatar-container {
-                  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
                 }
+                
                 .profile-avatar-container:hover {
-                  transform: scale(1.03);
+                  transform: scale(1.05);
                 }
+                
+                .profile-avatar-container:hover .profile-avatar-bg {
+                  width: 180px;
+                  height: 180px;
+                  background: radial-gradient(circle, ${token.colorPrimary}25 0%, ${token.colorPrimary}12 40%, transparent 70%);
+                }
+                
+                .profile-avatar-container:hover .profile-avatar-border {
+                  box-shadow: 
+                    0 0 0 1px rgba(255, 255, 255, 0.15) inset,
+                    0 12px 40px rgba(0, 0, 0, 0.15),
+                    0 6px 20px rgba(0, 0, 0, 0.1),
+                    0 0 60px ${token.colorPrimary}25;
+                  animation: profileGlow 2s ease-in-out infinite;
+                }
+                
                 .profile-avatar-container:hover .profile-avatar-actions {
                   opacity: 1 !important;
-                  transform: translateY(0) !important;
+                  transform: translateY(0) scale(1) !important;
+                }
+                
+                .profile-avatar-container:active {
+                  transform: scale(1.02);
                 }
               `}</style>
               <div style={{ marginTop: token.marginMD }}>
@@ -664,7 +801,7 @@ export default function ProfilePage() {
                     value={preferences?.language || 'en'}
                     style={{ width: '100%' }}
                     onChange={(value) => {
-                      updatePreferencesMutation.mutate({
+                      debouncedUpdatePreferences({
                         theme: preferences?.theme || 'light',
                         language: value,
                         fontFamily: preferences?.fontFamily || DEFAULT_FONT,
@@ -701,8 +838,8 @@ export default function ProfilePage() {
                     onChange={(value) => {
                       // Apply font immediately
                       applyFontFamily(value);
-                      // Save to preferences
-                      updatePreferencesMutation.mutate({
+                      // Save to preferences with debounce
+                      debouncedUpdatePreferences({
                         theme: preferences?.theme || 'light',
                         language: preferences?.language || 'en',
                         fontFamily: value,
