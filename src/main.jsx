@@ -8,6 +8,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { handleApiError } from './utils/errorHandler';
 import LoadingScreen from './components/LoadingScreen';
+import { DEFAULT_FONT } from './utils/fontLoader';
 import 'antd/dist/reset.css';
 
 // Configure Ant Design message to show only one toast at a time
@@ -59,7 +60,8 @@ const queryClient = new QueryClient({
 });
 
 function ThemeConfigWrapper({ children }) {
-  const { algorithm } = useTheme();
+  const { algorithm, fontFamily } = useTheme();
+  const currentFont = fontFamily || DEFAULT_FONT;
   
   return (
     <ConfigProvider
@@ -69,6 +71,7 @@ function ThemeConfigWrapper({ children }) {
         token: {
           colorPrimary: '#1890ff',
           borderRadius: 6,
+          fontFamily: `"${currentFont}", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
         },
       }}
     >
