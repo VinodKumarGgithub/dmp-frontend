@@ -20,9 +20,15 @@ export default function DataTable({
 }) {
   // Build table columns from config or data
   const tableColumns = useMemo(() => {
+    const maxVisibleColumns = 5;
+    
     // If columns are specified in config, use them
     if (config?.columns && Array.isArray(config.columns) && config.columns.length > 0) {
-      const columns = config.columns.map((col) => ({
+      // Limit to max 5 visible columns
+      const visibleColumns = config.columns.slice(0, maxVisibleColumns);
+      const hasHidden = config.columns.length > maxVisibleColumns;
+      
+      const columns = visibleColumns.map((col) => ({
         title: col.label || col.name,
         dataIndex: col.name,
         key: col.name,
@@ -38,7 +44,7 @@ export default function DataTable({
       }));
 
       // Only add "More" column if there are hidden columns
-      if (hasHiddenColumns) {
+      if (hasHidden || hasHiddenColumns) {
         columns.push({
           title: 'More',
           key: 'more',
@@ -68,7 +74,6 @@ export default function DataTable({
       // Get all unique keys from the first record
       const firstRecord = data[0];
       const allKeys = Object.keys(firstRecord);
-      const maxVisibleColumns = 5;
       const visibleKeys = allKeys.slice(0, maxVisibleColumns);
       const hiddenKeys = allKeys.slice(maxVisibleColumns);
 
