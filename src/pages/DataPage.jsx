@@ -770,6 +770,34 @@ function DataPage() {
                           }}
                           aria-label={`Filter ${field.label} by date range`}
                         />
+                      ) : field.type === 'tags' ? (
+                        <Select
+                          id={`filter-${field.name}`}
+                          mode="tags"
+                          placeholder={`Type and press Enter to add ${field.label} values`}
+                          allowClear
+                          style={{ width: '100%' }}
+                          onChange={(values) => {
+                            // Convert array to comma-separated string for backend
+                            const filterValue = Array.isArray(values) && values.length > 0 
+                              ? values.join(',')
+                              : '';
+                            handleFilterChange(field.name, filterValue, false);
+                          }}
+                          value={
+                            filters[field.name] 
+                              ? (typeof filters[field.name] === 'string'
+                                  ? filters[field.name].split(',').filter(v => v.trim())
+                                  : Array.isArray(filters[field.name])
+                                    ? filters[field.name]
+                                    : [])
+                              : undefined
+                          }
+                          tokenSeparators={[',']}
+                          aria-label={`Filter by ${field.label}`}
+                          notFoundContent={null}
+                          maxTagCount="responsive"
+                        />
                       ) : (
                         <Input
                           id={`filter-${field.name}`}

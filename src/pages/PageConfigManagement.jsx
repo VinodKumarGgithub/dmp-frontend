@@ -1279,6 +1279,7 @@ export default function PageConfigManagement() {
                           >
                             <Select>
                               <Option value="text">Text Input</Option>
+                              <Option value="tags">Multi-Search (Tags)</Option>
                               <Option value="select">Dropdown</Option>
                               <Option value="number">Number</Option>
                               <Option value="date">Date Range</Option>
