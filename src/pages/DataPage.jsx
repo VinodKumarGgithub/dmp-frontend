@@ -317,9 +317,12 @@ function DataPage() {
 
     setDownloading(pageKey, true);
     try {
-      // Use all columns from config for download
-      const allColumnNames = config?.columns?.map(col => col.name) || [];
-      await downloadPageData(pageKey, queryParams, allColumnNames, exportFormat, config);
+      // Use only visible columns for download (not hidden columns)
+      // Fallback to all config columns if no visible columns (edge case)
+      const visibleColumnNames = visibleColumns.length > 0
+        ? visibleColumns.map(col => col.name)
+        : (config?.columns?.map(col => col.name) || []);
+      await downloadPageData(pageKey, queryParams, visibleColumnNames, exportFormat, config);
       showSuccess(`Download completed successfully (${exportFormat.toUpperCase()})`);
     } catch (error) {
       // Error already handled by downloadPageData
@@ -846,9 +849,9 @@ function DataPage() {
 
       {/* Column Preferences Modal */}
       {config?.columns && (
-        <Modal
+      <Modal
           title="Column Preferences"
-          open={columnModalOpen}
+        open={columnModalOpen}
           onCancel={() => {
             setColumnModalOpen(false);
             handleRevertColumnPreferences();
@@ -857,25 +860,25 @@ function DataPage() {
           okText="Save"
           cancelText="Cancel"
           width={600}
-        >
-          <Alert
-            message="Column Customization"
+      >
+        <Alert
+          message="Column Customization"
             description="Toggle column visibility and drag columns to reorder them. All visible columns will be shown in the table."
-            type="info"
-            showIcon
+          type="info"
+          showIcon
             style={{ marginBottom: token.marginLG }}
-          />
+        />
           <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
             {columnSettings.map((col, index) => (
-              <div
-                key={col.name}
+            <div
+              key={col.name}
                 draggable
                 onDragStart={() => handleDragStart(index)}
                 onDragOver={(e) => handleDragOver(e, index)}
                 onDragEnd={handleDragEnd}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
+              style={{
+                display: 'flex',
+                alignItems: 'center',
                   padding: token.paddingSM,
                   borderBottom: `1px solid ${token.colorBorderSecondary}`,
                   gap: token.marginSM,
@@ -890,20 +893,20 @@ function DataPage() {
                     color: token.colorTextSecondary,
                     marginRight: token.marginXS,
                     cursor: 'grab',
-                  }}
+              }}
                   title="Drag to reorder"
                 >
                   ⋮⋮
                 </span>
-                <Checkbox
+              <Checkbox
                   checked={col.visible}
                   onChange={(e) => handleColumnSettingsChange(index, 'visible', e.target.checked)}
-                >
+              >
                   <span style={{ fontWeight: col.visible ? 500 : 400 }}>
                     {col.label}
                   </span>
-                </Checkbox>
-              </div>
+              </Checkbox>
+            </div>
             ))}
           </div>
           <div style={{ marginTop: token.marginLG, display: 'flex', justifyContent: 'space-between' }}>
@@ -914,21 +917,21 @@ function DataPage() {
               Reset to Defaults
             </Button>
           </div>
-        </Modal>
+      </Modal>
       )}
 
       {/* Drawer for showing additional record details */}
       {selectedRecord && (
-        <Drawer
-          title="Additional Details"
-          placement="right"
-          onClose={() => {
+      <Drawer
+        title="Additional Details"
+        placement="right"
+        onClose={() => {
             setDrawerVisible(false);
             setSelectedRecord(null);
-          }}
-          open={drawerVisible}
-          width={600}
-        >
+        }}
+        open={drawerVisible}
+        width={600}
+      >
           <Descriptions
             bordered
             column={1}
@@ -947,30 +950,30 @@ function DataPage() {
               let displayValue = '-';
               if (value !== null && value !== undefined) {
                 if (col.type === 'date' && value) {
-                  try {
-                    displayValue = new Date(value).toLocaleDateString();
-                  } catch {
+                    try {
+                      displayValue = new Date(value).toLocaleDateString();
+                    } catch {
+                      displayValue = String(value);
+                    }
+                  } else {
                     displayValue = String(value);
                   }
-                } else {
-                  displayValue = String(value);
                 }
-              }
-              return (
+                return (
                 <Descriptions.Item key={col.name} label={col.label}>
-                  <div
-                    style={{
-                      wordBreak: 'break-word',
-                      color: token.colorText,
-                    }}
-                  >
-                    {displayValue}
-                  </div>
-                </Descriptions.Item>
-              );
+                    <div
+                      style={{
+                        wordBreak: 'break-word',
+                        color: token.colorText,
+                      }}
+                    >
+                      {displayValue}
+                    </div>
+                  </Descriptions.Item>
+                );
             })}
           </Descriptions>
-        </Drawer>
+      </Drawer>
       )}
     </div>
   );

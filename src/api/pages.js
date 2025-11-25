@@ -241,9 +241,15 @@ function convertToExcel(data, selectedColumns = [], config = {}) {
  */
 export async function downloadPageData(pageKey, queryParams = {}, selectedColumns = [], format = 'csv', config = {}) {
   try {
-    // Fetch JSON data from backend
+    // Build params with selected columns (comma-separated string)
+    const params = { ...queryParams, format };
+    if (selectedColumns && selectedColumns.length > 0) {
+      params.columns = selectedColumns.join(',');
+    }
+    
+    // Fetch JSON data from backend (only selected columns will be returned)
     const response = await axiosInstance.get(`/pages/${pageKey}/download`, {
-      params: { ...queryParams, format },
+      params,
       responseType: 'json',
     });
 

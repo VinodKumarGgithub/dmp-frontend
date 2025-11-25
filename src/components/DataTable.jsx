@@ -81,17 +81,17 @@ export default function DataTable({
         
         return {
           title: titleContent,
-          dataIndex: col.name,
-          key: col.name,
-          width: col.width,
-          sorter: true,
-          render: (value) => {
-            if (value === null || value === undefined) return '-';
-            if (col.type === 'date' && value) {
-              return new Date(value).toLocaleDateString();
-            }
-            return String(value);
-          },
+        dataIndex: col.name,
+        key: col.name,
+        width: col.width,
+        sorter: true,
+        render: (value) => {
+          if (value === null || value === undefined) return '-';
+          if (col.type === 'date' && value) {
+            return new Date(value).toLocaleDateString();
+          }
+          return String(value);
+        },
         };
       });
 
