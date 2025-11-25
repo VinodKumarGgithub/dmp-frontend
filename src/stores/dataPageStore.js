@@ -8,8 +8,6 @@ const defaultPageState = {
     pageSize: 20,
   },
   sorting: {},
-  drawerVisible: false,
-  selectedRecord: null,
   downloading: false,
 };
 
@@ -122,36 +120,6 @@ const useDataPageStore = create((set, get) => ({
           [pageKey]: {
             ...currentState,
             sorting,
-          },
-        },
-      };
-    });
-  },
-
-  setDrawerVisible: (pageKey, visible) => {
-    set((state) => {
-      const currentState = state.pageStates[pageKey] || defaultPageState;
-      return {
-        pageStates: {
-          ...state.pageStates,
-          [pageKey]: {
-            ...currentState,
-            drawerVisible: visible,
-          },
-        },
-      };
-    });
-  },
-
-  setSelectedRecord: (pageKey, record) => {
-    set((state) => {
-      const currentState = state.pageStates[pageKey] || defaultPageState;
-      return {
-        pageStates: {
-          ...state.pageStates,
-          [pageKey]: {
-            ...currentState,
-            selectedRecord: record,
           },
         },
       };

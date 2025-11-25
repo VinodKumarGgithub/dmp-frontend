@@ -2,7 +2,6 @@ import HomePage from '../pages/HomePage';
 import LoginPage from '../pages/LoginPage';
 import PageConfigManagement from '../pages/PageConfigManagement';
 import UserManagement from '../pages/UserManagement';
-import ProfilePage from '../pages/ProfilePage';
 import DataPage from '../pages/DataPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 import AdminRoute from '../components/AdminRoute';
@@ -36,12 +35,6 @@ export const protectedRoutes = [
     label: 'User Management',
     key: 'users',
     adminOnly: true,
-  },
-  {
-    path: '/profile',
-    element: <ProfilePage />,
-    key: 'profile',
-    // No label - accessible only from user dropdown, not side menu
   },
   {
     path: '/pages/:pageKey',

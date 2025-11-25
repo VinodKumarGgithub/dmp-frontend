@@ -29,7 +29,6 @@ export default function TenantSelector() {
     // Invalidate queries that are tenant-dependent:
     // - ['pages'] - pages list
     // - ['pages', pageKey, ...] - page config and data (all variants)
-    // - ['page-preferences', pageKey] - page preferences
     // - ['db', ...] - database-related queries (tables, columns, indexes, procedures)
     // - ['pageTenantAccess', ...] - page tenant access
     queryClient.invalidateQueries({ 
@@ -38,7 +37,7 @@ export default function TenantSelector() {
         if (Array.isArray(queryKey) && queryKey.length > 0) {
           const firstKey = queryKey[0];
           // Invalidate all tenant-dependent queries
-          return ['pages', 'page-preferences', 'db', 'pageTenantAccess'].includes(firstKey);
+          return ['pages', 'db', 'pageTenantAccess'].includes(firstKey);
         }
         return false;
       }

@@ -13,14 +13,6 @@ const useAuthStore = create(
       // Actions
       setUser: (user) => set({ user }),
       
-      // Update user profile (merges with existing user data)
-      updateUserProfile: (profileData) => {
-        const currentUser = get().user;
-        if (currentUser) {
-          set({ user: { ...currentUser, ...profileData } });
-        }
-      },
-      
       setSelectedTenant: (tenantId) => {
         set({ selectedTenant: tenantId });
       },
@@ -41,7 +33,6 @@ const useAuthStore = create(
             name: payload.name,
             email: payload.email,
             phone_number: payload.phone_number,
-            profile_picture: payload.profile_picture,
           };
           
           set({ user: userData, pagesLoading: true });

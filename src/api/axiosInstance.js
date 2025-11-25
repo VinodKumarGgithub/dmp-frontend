@@ -43,6 +43,38 @@ axiosInstance.interceptors.response.use(
     return response.data;
   },
   (error) => {
+    // Handle 401 Unauthorized - automatically logout
+    if (error.response?.status === 401) {
+      // Don't logout if we're already on the login page or trying to login
+      const isLoginRequest = error.config?.url?.includes('/auth/login');
+      const isLoginPage = window.location.pathname === '/login';
+      
+      if (!isLoginRequest && !isLoginPage) {
+        // Clear auth state
+        const store = useAuthStore.getState();
+        store.logout(null, null);
+        
+        // Clear token from localStorage
+        localStorage.removeItem('token');
+        
+        // Clear all cached queries
+        // Note: We can't import QueryClient here, so we'll rely on the store clearing
+        
+        // Show message
+        message.warning('Your session has expired. Please login again.', 4);
+        
+        // Redirect to login page
+        window.location.href = '/login';
+        
+        // Return a rejected promise to stop further processing
+        return Promise.reject({
+          code: 'UNAUTHORIZED',
+          message: 'Session expired. Please login again.',
+          status: 401,
+        });
+      }
+    }
+
     // Handle error response
     const errorResponse = error.response?.data || {};
     const errorCode = errorResponse.error?.code || errorResponse.code || 'INTERNAL_ERROR';

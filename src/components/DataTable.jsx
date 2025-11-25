@@ -1,7 +1,6 @@
-import { useMemo } from 'react';
-import { Table, Card, Skeleton, Typography, Tooltip } from 'antd';
-import { FileTextOutlined, MoreOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import { Button } from 'antd';
+import { useMemo, useState } from 'react';
+import { Table, Card, Skeleton, Typography, Tooltip, Button } from 'antd';
+import { FileTextOutlined, InfoCircleOutlined, MoreOutlined } from '@ant-design/icons';
 
 const { Title } = Typography;
 
@@ -14,43 +13,94 @@ export default function DataTable({
   sorting,
   onTableChange,
   onMoreClick,
+  onColumnReorder,
   token,
   hasMore = false,
   hasHiddenColumns = false,
 }) {
+  const [draggedColumnIndex, setDraggedColumnIndex] = useState(null);
+  // Handle column drag in table
+  const handleColumnDragStart = (index) => {
+    setDraggedColumnIndex(index);
+  };
+
+  const handleColumnDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedColumnIndex === null || draggedColumnIndex === index || !onColumnReorder) return;
+    
+    // Call parent handler to reorder columns
+    onColumnReorder(draggedColumnIndex, index);
+    setDraggedColumnIndex(index);
+  };
+
+  const handleColumnDragEnd = () => {
+    setDraggedColumnIndex(null);
+  };
+
   // Build table columns from config or data
   const tableColumns = useMemo(() => {
     const maxVisibleColumns = 5;
     
     // If columns are specified in config, use them
-    // Note: config.columns already contains only visible columns (filtered by DataPage)
-    // So we should use ALL columns from config, not limit to 5
     if (config?.columns && Array.isArray(config.columns) && config.columns.length > 0) {
-      // Use all columns from config (they're already filtered by visibility in DataPage)
-      // Check if there are more columns in the original config that might be hidden
-      // by comparing with hasHiddenColumns prop
-      const columns = config.columns.map((col) => ({
-        title: col.label || col.name,
-        dataIndex: col.name,
-        key: col.name,
-        width: col.width,
-        sorter: true,
-        render: (value) => {
-          if (value === null || value === undefined) return '-';
-          if (col.type === 'date' && value) {
-            return new Date(value).toLocaleDateString();
-          }
-          return String(value);
-        },
-      }));
+      // Use visible columns from config
+      const columns = config.columns.map((col, index) => {
+        const isMoreColumn = col.name === 'more' || col.key === 'more';
+        
+        // Create draggable title component
+        const titleContent = onColumnReorder && !isMoreColumn ? (
+          <div
+            draggable
+            onDragStart={() => handleColumnDragStart(index)}
+            onDragOver={(e) => handleColumnDragOver(e, index)}
+            onDragEnd={handleColumnDragEnd}
+            style={{
+              cursor: 'move',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              userSelect: 'none',
+              opacity: draggedColumnIndex === index ? 0.5 : 1,
+            }}
+          >
+            <span
+              style={{
+                fontSize: '14px',
+                color: token.colorTextSecondary,
+                cursor: 'grab',
+              }}
+              title="Drag to reorder"
+            >
+              ⋮⋮
+            </span>
+            <span>{col.label || col.name}</span>
+          </div>
+        ) : (
+          <span>{col.label || col.name}</span>
+        );
+        
+        return {
+          title: titleContent,
+          dataIndex: col.name,
+          key: col.name,
+          width: col.width,
+          sorter: true,
+          render: (value) => {
+            if (value === null || value === undefined) return '-';
+            if (col.type === 'date' && value) {
+              return new Date(value).toLocaleDateString();
+            }
+            return String(value);
+          },
+        };
+      });
 
-      // Only add "More" column if there are hidden columns
-      // hasHiddenColumns prop indicates if there are columns not shown in the table
-      if (hasHiddenColumns) {
+      // Add "More" column if there are hidden columns
+      if (hasHiddenColumns && onMoreClick) {
         columns.push({
           title: 'More',
           key: 'more',
-          width: 100,
+          width: 80,
           fixed: 'right',
           render: (_, record) => {
             return (
@@ -60,9 +110,8 @@ export default function DataTable({
                 size="small"
                 onClick={() => onMoreClick(record)}
                 style={{ color: token.colorPrimary }}
-              >
-                {/* View More */}
-              </Button>
+                title="View more details"
+              />
             );
           },
         });
@@ -79,8 +128,8 @@ export default function DataTable({
       const visibleKeys = allKeys.slice(0, maxVisibleColumns);
       const hiddenKeys = allKeys.slice(maxVisibleColumns);
 
-      // Build visible columns
-      const columns = visibleKeys.map((key) => ({
+      // Build columns from all keys (show all columns)
+      const columns = allKeys.map((key) => ({
         title: key.charAt(0).toUpperCase() + key.slice(1).replace(/_/g, ' '),
         dataIndex: key,
         key: key,
@@ -99,34 +148,11 @@ export default function DataTable({
         },
       }));
 
-      // Add "More" column if there are hidden columns
-      if (hiddenKeys.length > 0) {
-        columns.push({
-          title: 'More',
-          key: 'more',
-          width: 100,
-          fixed: 'right',
-          render: (_, record) => {
-            return (
-              <Button
-                type="link"
-                icon={<MoreOutlined />}
-                size="small"
-                onClick={() => onMoreClick(record)}
-                style={{ color: token.colorPrimary }}
-              >
-                {/* View More */}
-              </Button>
-            );
-          },
-        });
-      }
-
       return columns;
     }
 
     return [];
-  }, [config, data, token, onMoreClick, hasHiddenColumns]);
+  }, [config, data, token, onMoreClick, hasHiddenColumns, onColumnReorder, draggedColumnIndex]);
 
   // Generate unique row key from record data - MUST be before any early returns
   const getRowKey = useMemo(() => {

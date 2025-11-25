@@ -12,14 +12,14 @@ import {
   Tag,
   Alert,
   Tooltip,
-  Modal,
-  Checkbox,
   theme as antdTheme,
   Row,
   Col,
+  Breadcrumb,
+  Modal,
+  Checkbox,
   Drawer,
   Descriptions,
-  Breadcrumb,
 } from 'antd';
 import {
   SearchOutlined,
@@ -27,21 +27,26 @@ import {
   ReloadOutlined,
   FileTextOutlined,
   HomeOutlined,
-  SettingOutlined,
-  ArrowUpOutlined,
-  ArrowDownOutlined,
   InfoCircleOutlined,
+  SettingOutlined,
+  MoreOutlined,
 } from '@ant-design/icons';
 import { useParams } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { usePage, downloadPageData } from '../api/pages';
-import { usePagePreferences, useSavePagePreferences } from '../api/pagePreferences';
 import { showSuccess, showError } from '../utils/errorHandler';
 import useAuthStore from '../stores/authStore';
 import useDataPageStore from '../stores/dataPageStore';
 import DataTable from '../components/DataTable';
 import ErrorDisplay from '../components/ErrorDisplay';
 import { useDebounce } from '../hooks/useDebounce';
+import {
+  getColumnPreferences,
+  saveColumnPreferences,
+  clearColumnPreferences,
+  initializeColumnSettings,
+  normalizeColumns,
+} from '../utils/columnPreferences';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -57,47 +62,19 @@ const toTitle = (text = '') => {
     .join(' ');
 };
 
-const buildColumnSettings = (baseColumns = [], preferences = []) => {
-  if (!Array.isArray(baseColumns) || baseColumns.length === 0) {
-    return [];
-  }
-
-  const baseMap = new Map(
-    baseColumns.map((col) => [col.name, { name: col.name, label: col.label || toTitle(col.name) }])
-  );
-
-  const normalizedPrefs = (Array.isArray(preferences) ? preferences : [])
-    .map((pref) => {
-      if (!pref) return null;
-      const name = pref.name || pref.column || pref;
-      if (!name || !baseMap.has(name)) return null;
-      return {
-        name,
-        visible: pref.visible !== false,
-        label: baseMap.get(name)?.label || toTitle(name),
-      };
-    })
-    .filter(Boolean);
-
-  const remaining = [];
-  baseMap.forEach((value, key) => {
-    if (!normalizedPrefs.some((pref) => pref.name === key)) {
-      remaining.push({ name: key, visible: true, label: value.label });
-    }
-  });
-
-  return [...normalizedPrefs, ...remaining];
-};
-
 function DataPage() {
   const { pageKey } = useParams();
   const { token } = antdTheme.useToken();
   const selectedTenant = useAuthStore((state) => state.selectedTenant);
   const [form] = Form.useForm();
-  const [columnSettings, setColumnSettings] = useState([]);
-  const [columnModalOpen, setColumnModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [exportFormat, setExportFormat] = useState('csv');
+  const [columnModalOpen, setColumnModalOpen] = useState(false);
+  const [columnSettings, setColumnSettings] = useState([]);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [drawerVisible, setDrawerVisible] = useState(false);
+  const [preferencesVersion, setPreferencesVersion] = useState(0);
+  const [draggedIndex, setDraggedIndex] = useState(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -127,8 +104,6 @@ function DataPage() {
   const setFilterValue = useDataPageStore((state) => state.setFilterValue);
   const setPagination = useDataPageStore((state) => state.setPagination);
   const setSorting = useDataPageStore((state) => state.setSorting);
-  const setDrawerVisible = useDataPageStore((state) => state.setDrawerVisible);
-  const setSelectedRecord = useDataPageStore((state) => state.setSelectedRecord);
   const setDownloading = useDataPageStore((state) => state.setDownloading);
   const resetPageState = useDataPageStore((state) => state.resetFilters);
 
@@ -136,8 +111,6 @@ function DataPage() {
   const searchText = pageState?.searchText ?? '';
   const filters = pageState?.filters ?? defaultFilters;
   const sorting = pageState?.sorting ?? defaultSorting;
-  const drawerVisible = pageState?.drawerVisible ?? false;
-  const selectedRecord = pageState?.selectedRecord ?? null;
   const downloading = pageState?.downloading ?? false;
 
   // Debounced values for API calls (500ms delay)
@@ -198,8 +171,6 @@ function DataPage() {
   // Use isFetching for table loading (shows loading on refetch)
   // Use isLoading only for initial config load check
   const { data: pageData, isLoading, isFetching, isError, error, refetch } = usePage(pageKey, queryParams);
-  const { data: pagePreferences } = usePagePreferences(pageKey, { enabled: Boolean(pageKey) });
-  const savePreferencesMutation = useSavePagePreferences(pageKey);
 
   // Handle response format from axios interceptor:
   // Backend returns: { success: true, message: "...", data: { config, data, total } }
@@ -211,143 +182,49 @@ function DataPage() {
   const backendTotal = pageData?.total ?? 0;
   const hasMore = config?.source_type === 'PROCEDURE' ? Boolean(pageData?.hasMore) : false;
 
-  const baseColumns = useMemo(() => {
-    if (!Array.isArray(config?.columns)) return [];
-    return config.columns.map((col) => ({
-      ...col,
-      label: col.label || toTitle(col.name),
-    }));
-  }, [config?.columns]);
+  // Load column preferences from localStorage
+  const savedPreferences = useMemo(() => {
+    if (!pageKey || !config?.columns) return null;
+    return getColumnPreferences(pageKey);
+  }, [pageKey, config?.columns, preferencesVersion]);
 
-  const fallbackPreferences = useMemo(() => {
-    if (!baseColumns.length) return [];
-    return baseColumns.map((col) => ({ name: col.name, visible: true }));
-  }, [baseColumns]);
+  // Build column settings with preferences applied
+  const buildColumnSettings = useCallback(() => {
+    if (!config?.columns || !Array.isArray(config.columns)) return [];
+    return initializeColumnSettings(config.columns, savedPreferences);
+  }, [config?.columns, savedPreferences]);
 
-  const applySavedPreferences = useCallback(() => {
-    if (!baseColumns.length) {
-      setColumnSettings([]);
-      return;
-    }
-    const prefs =
-      Array.isArray(pagePreferences?.tableColumns) && pagePreferences.tableColumns.length > 0
-        ? pagePreferences.tableColumns
-        : fallbackPreferences;
-    setColumnSettings(buildColumnSettings(baseColumns, prefs));
-  }, [baseColumns, fallbackPreferences, pagePreferences?.tableColumns]);
-
+  // Initialize column settings when config loads
   useEffect(() => {
-    applySavedPreferences();
-  }, [applySavedPreferences]);
+    if (config?.columns) {
+      const settings = buildColumnSettings();
+      setColumnSettings(settings);
+    }
+  }, [config?.columns, buildColumnSettings]);
 
-  const visibleColumnNames = useMemo(
-    () => columnSettings.filter((col) => col.visible !== false).map((col) => col.name),
-    [columnSettings]
-  );
-
-  const displayColumns = useMemo(() => {
-    if (!config?.columns) return [];
-    if (columnSettings.length === 0) return config.columns;
-
-    const columnMap = new Map(config.columns.map((col) => [col.name, col]));
-    const ordered = [];
-    columnSettings.forEach((setting) => {
-      const column = columnMap.get(setting.name);
-      if (column && setting.visible !== false) {
-        ordered.push(column);
-      }
+  // Get visible columns (all visible ones, not limited to 5)
+  const visibleColumns = useMemo(() => {
+    if (!config?.columns || columnSettings.length === 0) return config?.columns || [];
+    const visible = columnSettings.filter(col => col.visible);
+    return visible.map(col => {
+      const originalCol = config.columns.find(c => c.name === col.name);
+      return originalCol || { name: col.name, label: col.label, type: col.type, width: col.width };
     });
-    // Include any columns not present in settings (new columns)
-    config.columns.forEach((column) => {
-      if (!columnSettings.some((setting) => setting.name === column.name)) {
-        ordered.push(column);
-      }
-    });
-    return ordered;
   }, [config?.columns, columnSettings]);
 
-  const displayConfig = useMemo(() => {
-    if (!config) return config;
+  // Get hidden columns (for modal/drawer - all columns that are not visible)
+  const hiddenColumns = useMemo(() => {
+    if (!config?.columns || columnSettings.length === 0) return [];
+    return columnSettings.filter(col => !col.visible);
+  }, [columnSettings]);
+
+  const tableConfig = useMemo(() => {
+    if (!config) return null;
     return {
       ...config,
-      columns: displayColumns,
+      columns: visibleColumns,
     };
-  }, [config, displayColumns]);
-
-  const tableConfig = displayConfig || config;
-
-  // Compute hidden columns (columns not visible in the table) for the "View More" drawer
-  const hiddenColumns = useMemo(() => {
-    if (!config?.columns || !Array.isArray(config.columns)) return [];
-    
-    // If no column settings, all columns are visible, so no hidden columns
-    if (columnSettings.length === 0) return [];
-    
-    // Build set of visible column names
-    const visibleSet = new Set(visibleColumnNames);
-    
-    // Filter out columns that are in the visible set
-    // This handles the case where all columns are set to visible: true
-    const hidden = config.columns.filter((col) => !visibleSet.has(col.name));
-    
-    return hidden;
-  }, [config?.columns, visibleColumnNames, columnSettings]);
-
-  const handleColumnModalClose = useCallback(() => {
-    setColumnModalOpen(false);
-  }, []);
-
-  const handleRevertToSaved = useCallback(() => {
-    applySavedPreferences();
-  }, [applySavedPreferences]);
-
-  const handleColumnVisibilityChange = (name, checked) => {
-    setColumnSettings((prev) =>
-      prev.map((col) => (col.name === name ? { ...col, visible: checked } : col))
-    );
-  };
-
-  const handleColumnMove = (name, direction) => {
-    setColumnSettings((prev) => {
-      const index = prev.findIndex((col) => col.name === name);
-      if (index === -1) return prev;
-      const newIndex = index + direction;
-      if (newIndex < 0 || newIndex >= prev.length) {
-        return prev;
-      }
-      const updated = [...prev];
-      const [moved] = updated.splice(index, 1);
-      updated.splice(newIndex, 0, moved);
-      return updated;
-    });
-  };
-
-  const handleResetColumnSettings = () => {
-    if (!baseColumns.length) {
-      setColumnSettings([]);
-      return;
-    }
-    setColumnSettings(buildColumnSettings(baseColumns, fallbackPreferences));
-  };
-
-  const handleSaveColumnSettings = () => {
-    if (!baseColumns.length) {
-      setColumnModalOpen(false);
-      return;
-    }
-    const payload = {
-      tableColumns: columnSettings.map((col) => ({ name: col.name, visible: col.visible !== false })),
-      downloadColumns: columnSettings.map((col) => ({ name: col.name, visible: col.visible !== false })),
-    };
-    savePreferencesMutation.mutate(payload, {
-      onSuccess: () => {
-        setColumnModalOpen(false);
-      },
-    });
-  };
-
-  const savingPreferences =
-    (savePreferencesMutation.isPending ?? savePreferencesMutation.isLoading) ?? false;
+  }, [config, visibleColumns]);
   
   // Initialize pagination with config's page_size_default when config loads
   useEffect(() => {
@@ -440,7 +317,9 @@ function DataPage() {
 
     setDownloading(pageKey, true);
     try {
-      await downloadPageData(pageKey, queryParams, visibleColumnNames, exportFormat, config);
+      // Use all columns from config for download
+      const allColumnNames = config?.columns?.map(col => col.name) || [];
+      await downloadPageData(pageKey, queryParams, allColumnNames, exportFormat, config);
       showSuccess(`Download completed successfully (${exportFormat.toUpperCase()})`);
     } catch (error) {
       // Error already handled by downloadPageData
@@ -457,8 +336,133 @@ function DataPage() {
   };
 
   const handleMoreClick = (record) => {
-    setSelectedRecord(pageKey, record);
-    setDrawerVisible(pageKey, true);
+    setSelectedRecord(record);
+    setDrawerVisible(true);
+  };
+
+  const handleColumnSettingsChange = (index, field, value) => {
+    const newSettings = [...columnSettings];
+    if (field === 'visible') {
+      newSettings[index].visible = value;
+    }
+    setColumnSettings(newSettings);
+  };
+
+  const handleDragStart = (index) => {
+    setDraggedIndex(index);
+  };
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+
+    const newSettings = [...columnSettings];
+    const draggedItem = newSettings[draggedIndex];
+    
+    // Remove dragged item
+    newSettings.splice(draggedIndex, 1);
+    
+    // Insert at new position
+    const newIndex = draggedIndex < index ? index - 1 : index;
+    newSettings.splice(newIndex, 0, draggedItem);
+    
+    // Update orders
+    newSettings.forEach((col, idx) => {
+      col.order = idx;
+    });
+    
+    setColumnSettings(newSettings);
+    setDraggedIndex(newIndex);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+
+  // Handle column reorder from table (direct drag in table headers)
+  const handleColumnReorder = useCallback((fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return;
+    
+    const newSettings = [...columnSettings];
+    const visibleColumns = newSettings.filter(col => col.visible);
+    
+    // Only reorder visible columns
+    if (fromIndex >= visibleColumns.length || toIndex >= visibleColumns.length) return;
+    
+    // Get the column names in current order
+    const visibleColumnNames = visibleColumns.map(col => col.name);
+    const draggedColumnName = visibleColumnNames[fromIndex];
+    
+    // Reorder the visible column names
+    visibleColumnNames.splice(fromIndex, 1);
+    visibleColumnNames.splice(toIndex, 0, draggedColumnName);
+    
+    // Update orders for all columns based on new visible order
+    let orderIndex = 0;
+    const visibleNamesSet = new Set(visibleColumnNames);
+    
+    // First update visible columns in their new order
+    visibleColumnNames.forEach(columnName => {
+      const settingIndex = newSettings.findIndex(s => s.name === columnName);
+      if (settingIndex !== -1) {
+        newSettings[settingIndex].order = orderIndex++;
+      }
+    });
+    
+    // Then update hidden columns (keep their relative order)
+    const hiddenColumns = newSettings.filter(s => !visibleNamesSet.has(s.name));
+    hiddenColumns.forEach(setting => {
+      setting.order = orderIndex++;
+    });
+    
+    // Re-sort all settings by order
+    newSettings.sort((a, b) => a.order - b.order);
+    setColumnSettings(newSettings);
+    
+    // Auto-save preferences when reordered in table
+    if (pageKey) {
+      const preferences = {
+        visibleColumns: normalizeColumns(newSettings),
+      };
+      saveColumnPreferences(pageKey, preferences);
+      setPreferencesVersion(prev => prev + 1);
+    }
+  }, [columnSettings, pageKey]);
+
+  const handleSaveColumnPreferences = () => {
+    if (!pageKey) return;
+    
+    const preferences = {
+      visibleColumns: normalizeColumns(columnSettings),
+    };
+    
+    saveColumnPreferences(pageKey, preferences);
+    showSuccess('Column preferences saved');
+    setColumnModalOpen(false);
+    setPreferencesVersion(prev => prev + 1);
+  };
+
+  const handleResetColumnPreferences = () => {
+    if (!pageKey || !config?.columns) return;
+    
+    clearColumnPreferences(pageKey);
+    const defaultSettings = config.columns.map((col, index) => ({
+      name: col.name,
+      label: col.label || col.name,
+      type: col.type || 'string',
+      visible: index < 5, // First 5 visible by default
+      order: index,
+      width: col.width,
+    }));
+    setColumnSettings(defaultSettings);
+    showSuccess('Column preferences reset to defaults');
+    setPreferencesVersion(prev => prev + 1);
+  };
+
+  const handleRevertColumnPreferences = () => {
+    if (!config?.columns) return;
+    const settings = buildColumnSettings();
+    setColumnSettings(settings);
   };
 
   // Only show full page loading on initial config load
@@ -628,17 +632,6 @@ function DataPage() {
               justifyContent: isMobile ? 'flex-start' : 'flex-end'
             }}
           >
-            <Tooltip title="Customize which columns appear in the table and their order. Your preferences are saved per page.">
-              <Button
-                icon={<SettingOutlined />}
-                onClick={() => setColumnModalOpen(true)}
-                disabled={!Array.isArray(config?.columns) || config.columns.length === 0}
-                aria-label="Configure column preferences"
-                aria-haspopup="dialog"
-              >
-                Columns
-              </Button>
-            </Tooltip>
             {config.is_download_allowed && (
               <Space.Compact>
                 <Tooltip title="CSV: Simple text format, easy to import. Excel: Formatted with headers, borders, and styling.">
@@ -675,6 +668,15 @@ function DataPage() {
             >
               Refresh
             </Button>
+            {config?.columns && config.columns.length > 0 && (
+              <Button
+                icon={<SettingOutlined />}
+                onClick={() => setColumnModalOpen(true)}
+                aria-label="Customize columns"
+              >
+                Columns
+              </Button>
+            )}
           </Space>
         </div>
 
@@ -834,111 +836,99 @@ function DataPage() {
           pagination={pagination}
           sorting={sorting}
           onTableChange={handleTableChange}
-          onMoreClick={handleMoreClick}
+          onMoreClick={hiddenColumns.length > 0 ? handleMoreClick : null}
+          onColumnReorder={handleColumnReorder}
           token={token}
           hasMore={hasMore}
           hasHiddenColumns={hiddenColumns.length > 0}
         />
       </Card>
 
-      <Modal
-        title={
-          <Space>
-            <span>Column Preferences</span>
-            <Tooltip title="Customize which columns appear in the table and their order. Changes apply immediately and are saved per page.">
-              <InfoCircleOutlined style={{ color: token.colorTextSecondary, fontSize: 14 }} />
-            </Tooltip>
-          </Space>
-        }
-        open={columnModalOpen}
-        onCancel={handleColumnModalClose}
-        destroyOnClose={false}
-        footer={[
-          <Button key="revert" onClick={handleRevertToSaved} disabled={!columnSettings.length}>
-            Revert to saved
-          </Button>,
-          <Button key="reset" onClick={handleResetColumnSettings} disabled={!columnSettings.length}>
-            Reset to defaults
-          </Button>,
-          <Button key="close" onClick={handleColumnModalClose}>
-            Close
-          </Button>,
-          <Button
-            key="save"
-            type="primary"
-            onClick={handleSaveColumnSettings}
-            loading={savingPreferences}
-            disabled={!columnSettings.length}
-          >
-            Save
-          </Button>,
-        ]}
-      >
-        <Alert
-          message="Column Customization"
-          description="Check/uncheck columns to show or hide them. Use arrow buttons to reorder. Your preferences apply to both the table view and downloads."
-          type="info"
-          showIcon
-          style={{ marginBottom: token.marginMD }}
-        />
-        {columnSettings.length === 0 ? (
-          <Typography.Text type="secondary">No columns available for this page.</Typography.Text>
-        ) : (
-          columnSettings.map((col, index) => (
-            <div
-              key={col.name}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '8px 0',
-                borderBottom:
-                  index !== columnSettings.length - 1 ? `1px solid ${token.colorSplit}` : 'none',
-              }}
-            >
-              <Checkbox
-                checked={col.visible !== false}
-                onChange={(e) => handleColumnVisibilityChange(col.name, e.target.checked)}
+      {/* Column Preferences Modal */}
+      {config?.columns && (
+        <Modal
+          title="Column Preferences"
+          open={columnModalOpen}
+          onCancel={() => {
+            setColumnModalOpen(false);
+            handleRevertColumnPreferences();
+          }}
+          onOk={handleSaveColumnPreferences}
+          okText="Save"
+          cancelText="Cancel"
+          width={600}
+        >
+          <Alert
+            message="Column Customization"
+            description="Toggle column visibility and drag columns to reorder them. All visible columns will be shown in the table."
+            type="info"
+            showIcon
+            style={{ marginBottom: token.marginLG }}
+          />
+          <div style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+            {columnSettings.map((col, index) => (
+              <div
+                key={col.name}
+                draggable
+                onDragStart={() => handleDragStart(index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDragEnd={handleDragEnd}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: token.paddingSM,
+                  borderBottom: `1px solid ${token.colorBorderSecondary}`,
+                  gap: token.marginSM,
+                  cursor: 'move',
+                  backgroundColor: draggedIndex === index ? token.colorFillSecondary : 'transparent',
+                  opacity: draggedIndex === index ? 0.5 : 1,
+                }}
               >
-                {col.label || toTitle(col.name)}
-              </Checkbox>
-              <Space>
-                <Button
-                  size="small"
-                  icon={<ArrowUpOutlined />}
-                  onClick={() => handleColumnMove(col.name, -1)}
-                  disabled={index === 0}
-                />
-                <Button
-                  size="small"
-                  icon={<ArrowDownOutlined />}
-                  onClick={() => handleColumnMove(col.name, 1)}
-                  disabled={index === columnSettings.length - 1}
-                />
-              </Space>
-            </div>
-          ))
-        )}
-        {columnSettings.length > 0 && (
-          <Typography.Paragraph type="secondary" style={{ marginTop: token.marginSM }}>
-            Select which columns appear in the table and their order. Downloads use the same
-            selection.
-          </Typography.Paragraph>
-        )}
-      </Modal>
+                <span
+                  style={{
+                    fontSize: '16px',
+                    color: token.colorTextSecondary,
+                    marginRight: token.marginXS,
+                    cursor: 'grab',
+                  }}
+                  title="Drag to reorder"
+                >
+                  ⋮⋮
+                </span>
+                <Checkbox
+                  checked={col.visible}
+                  onChange={(e) => handleColumnSettingsChange(index, 'visible', e.target.checked)}
+                >
+                  <span style={{ fontWeight: col.visible ? 500 : 400 }}>
+                    {col.label}
+                  </span>
+                </Checkbox>
+              </div>
+            ))}
+          </div>
+          <div style={{ marginTop: token.marginLG, display: 'flex', justifyContent: 'space-between' }}>
+            <Button onClick={handleRevertColumnPreferences}>
+              Revert to Saved
+            </Button>
+            <Button onClick={handleResetColumnPreferences} danger>
+              Reset to Defaults
+            </Button>
+          </div>
+        </Modal>
+      )}
 
-      {/* Drawer for showing additional columns */}
-      <Drawer
-        title="Additional Details"
-        placement="right"
-        onClose={() => {
-          setDrawerVisible(pageKey, false);
-          setSelectedRecord(pageKey, null);
-        }}
-        open={drawerVisible}
-        width={600}
-      >
-        {selectedRecord && (
+      {/* Drawer for showing additional record details */}
+      {selectedRecord && (
+        <Drawer
+          title="Additional Details"
+          placement="right"
+          onClose={() => {
+            setDrawerVisible(false);
+            setSelectedRecord(null);
+          }}
+          open={drawerVisible}
+          width={600}
+        >
           <Descriptions
             bordered
             column={1}
@@ -952,21 +942,22 @@ function DataPage() {
               background: token.colorBgContainer,
             }}
           >
-            {(() => {
-              // Show only hidden columns (columns not visible in the table)
-              if (hiddenColumns.length > 0) {
-                return hiddenColumns.map((col) => {
+            {hiddenColumns.map((col) => {
               const value = selectedRecord[col.name];
               let displayValue = '-';
               if (value !== null && value !== undefined) {
                 if (col.type === 'date' && value) {
-                  displayValue = new Date(value).toLocaleDateString();
+                  try {
+                    displayValue = new Date(value).toLocaleDateString();
+                  } catch {
+                    displayValue = String(value);
+                  }
                 } else {
                   displayValue = String(value);
                 }
               }
               return (
-                <Descriptions.Item key={col.name} label={col.label || col.name}>
+                <Descriptions.Item key={col.name} label={col.label}>
                   <div
                     style={{
                       wordBreak: 'break-word',
@@ -977,55 +968,10 @@ function DataPage() {
                   </div>
                 </Descriptions.Item>
               );
-                });
-              }
-              
-              // Fallback: if no column config, show all fields not in visible columns
-              if (selectedRecord && typeof selectedRecord === 'object') {
-                const visibleSet = new Set(visibleColumnNames);
-                const hiddenFields = Object.entries(selectedRecord).filter(([key]) => !visibleSet.has(key));
-                
-                if (hiddenFields.length > 0) {
-                  return hiddenFields.map(([key, value]) => {
-                let displayValue = '-';
-                if (value !== null && value !== undefined) {
-                  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-                    try {
-                      displayValue = new Date(value).toLocaleDateString();
-                    } catch {
-                      displayValue = String(value);
-                    }
-                  } else {
-                    displayValue = String(value);
-                  }
-                }
-                return (
-                      <Descriptions.Item key={key} label={key.replace(/_/g, ' ').toUpperCase()}>
-                    <div
-                      style={{
-                        wordBreak: 'break-word',
-                        color: token.colorText,
-                      }}
-                    >
-                      {displayValue}
-                    </div>
-                  </Descriptions.Item>
-                );
-              });
-                }
-              }
-
-              return (
-                <Descriptions.Item key="no-data" label="No additional data">
-                  <Typography.Text type="secondary">
-                    All columns are currently visible in the table. Use the Columns button to hide some columns.
-                  </Typography.Text>
-                </Descriptions.Item>
-              );
-            })()}
+            })}
           </Descriptions>
-        )}
-      </Drawer>
+        </Drawer>
+      )}
     </div>
   );
 }

@@ -20,20 +20,15 @@ export function getGravatarUrl(email, size = 200) {
 }
 
 /**
- * Get user avatar URL (profile picture or Gravatar fallback)
- * @param {Object} user - User object with profile_picture and email
+ * Get user avatar URL (Gravatar based on email)
+ * @param {Object} user - User object with email
  * @param {number} size - Avatar size in pixels (default: 200)
  * @returns {string|null} Avatar URL or null
  */
 export function getUserAvatarUrl(user, size = 200) {
   if (!user) return null;
   
-  // Use profile picture if available
-  if (user.profile_picture) {
-    return user.profile_picture;
-  }
-  
-  // Fallback to Gravatar if email is available
+  // Use Gravatar if email is available
   if (user.email) {
     return getGravatarUrl(user.email, size);
   }

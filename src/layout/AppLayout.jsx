@@ -103,19 +103,6 @@ function AppLayout({ children }) {
       type: 'divider',
     },
     {
-      key: 'profile',
-      label: (
-        <Space>
-          <UserOutlined />
-          <span>Profile</span>
-        </Space>
-      ),
-      onClick: () => navigate('/profile'),
-    },
-    {
-      type: 'divider',
-    },
-    {
       key: 'logout',
       label: (
         <Space>
