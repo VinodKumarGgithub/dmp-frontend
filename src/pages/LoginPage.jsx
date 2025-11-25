@@ -239,6 +239,10 @@ export default function LoginPage() {
                 borderRadius: token.borderRadius,
                 fontSize: token.fontSizeLG,
                 fontWeight: 500,
+                background: isDark
+                  ? 'linear-gradient(90deg, rgba(24, 144, 255, 0.9) 0%, rgba(24, 144, 255, 0.6) 50%, rgba(24, 144, 255, 0.3) 100%)'
+                  : 'linear-gradient(90deg, rgba(24, 144, 255, 0.95) 0%, rgba(24, 144, 255, 0.7) 50%, rgba(24, 144, 255, 0.4) 100%)',
+                border: 'none',
                 boxShadow: isDark
                   ? '0 4px 12px rgba(24, 144, 255, 0.3)'
                   : '0 4px 12px rgba(24, 144, 255, 0.2)',
