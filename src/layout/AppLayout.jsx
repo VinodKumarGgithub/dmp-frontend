@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react';
 import { ProLayout } from '@ant-design/pro-layout';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { UserOutlined, LogoutOutlined, HomeOutlined, SettingOutlined, MailOutlined, PhoneOutlined } from '@ant-design/icons';
@@ -12,7 +13,7 @@ import { protectedRoutes } from '../config/routes';
 import useAppConfigStore from '../stores/appConfigStore';
 import { getUserAvatarUrl } from '../utils/gravatar';
 
-export default function AppLayout({ children }) {
+function AppLayout({ children }) {
   const navigate = useNavigate();
   const location = useLocation();
   const user = useAuthStore((state) => state.user);
@@ -29,7 +30,8 @@ export default function AppLayout({ children }) {
   };
 
   // Build menu items from protected routes and pages config
-  const menuItems = [
+  // Memoize to prevent re-renders when tenant changes (menu doesn't depend on tenant)
+  const menuItems = useMemo(() => [
     // Home is always first
     {
       path: '/',
@@ -62,7 +64,7 @@ export default function AppLayout({ children }) {
             <HomeOutlined />
           ),
       })),
-  ];
+  ], [user?.role]);
 
   const { Text } = Typography;
 
@@ -183,3 +185,10 @@ export default function AppLayout({ children }) {
     </ProLayout>
   );
 }
+
+// Memoize AppLayout to prevent re-renders when tenant changes
+// AppLayout structure (menu, header, etc.) doesn't depend on tenant
+export default memo(AppLayout, (prevProps, nextProps) => {
+  // Only re-render if children actually change
+  return prevProps.children === nextProps.children;
+});
