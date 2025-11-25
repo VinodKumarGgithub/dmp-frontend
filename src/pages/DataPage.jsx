@@ -98,6 +98,8 @@ function DataPage() {
   const [columnModalOpen, setColumnModalOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [exportFormat, setExportFormat] = useState('csv');
+  const [draggingColumn, setDraggingColumn] = useState(null);
+  const [dragOverColumn, setDragOverColumn] = useState(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -321,6 +323,48 @@ function DataPage() {
       return updated;
     });
   };
+
+  const handleDragStart = useCallback((name) => {
+    setDraggingColumn(name);
+  }, []);
+
+  const handleDragEnter = useCallback(
+    (name) => {
+      if (draggingColumn && name !== draggingColumn) {
+        setDragOverColumn(name);
+      }
+    },
+    [draggingColumn]
+  );
+
+  const handleDragEnd = useCallback(() => {
+    setDraggingColumn(null);
+    setDragOverColumn(null);
+  }, []);
+
+  const handleDrop = useCallback(
+    (targetName) => {
+      if (!draggingColumn || draggingColumn === targetName) {
+        handleDragEnd();
+        return;
+      }
+
+      setColumnSettings((prev) => {
+        const sourceIndex = prev.findIndex((col) => col.name === draggingColumn);
+        const targetIndex = prev.findIndex((col) => col.name === targetName);
+        if (sourceIndex === -1 || targetIndex === -1) {
+          return prev;
+        }
+        const updated = [...prev];
+        const [moved] = updated.splice(sourceIndex, 1);
+        updated.splice(targetIndex, 0, moved);
+        return updated;
+      });
+
+      handleDragEnd();
+    },
+    [draggingColumn, handleDragEnd]
+  );
 
   const handleResetColumnSettings = () => {
     if (!baseColumns.length) {
@@ -876,7 +920,7 @@ function DataPage() {
       >
         <Alert
           message="Column Customization"
-          description="Check/uncheck columns to show or hide them. Use arrow buttons to reorder. Your preferences apply to both the table view and downloads."
+          description="Check/uncheck columns to show or hide them. Drag and drop or use the arrows to reorder. Your preferences apply to both the table view and downloads."
           type="info"
           showIcon
           style={{ marginBottom: token.marginMD }}
@@ -887,6 +931,19 @@ function DataPage() {
           columnSettings.map((col, index) => (
             <div
               key={col.name}
+              role="listitem"
+              draggable
+              aria-grabbed={draggingColumn === col.name}
+              onDragStart={() => handleDragStart(col.name)}
+              onDragOver={(event) => {
+                event.preventDefault();
+                handleDragEnter(col.name);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                handleDrop(col.name);
+              }}
+              onDragEnd={handleDragEnd}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -894,6 +951,15 @@ function DataPage() {
                 padding: '8px 0',
                 borderBottom:
                   index !== columnSettings.length - 1 ? `1px solid ${token.colorSplit}` : 'none',
+                background:
+                  draggingColumn === col.name
+                    ? token.colorPrimaryBg
+                    : dragOverColumn === col.name
+                    ? token.colorFillSecondary
+                    : 'transparent',
+                cursor: 'grab',
+                borderRadius: 4,
+                transition: 'background 0.2s ease',
               }}
             >
               <Checkbox

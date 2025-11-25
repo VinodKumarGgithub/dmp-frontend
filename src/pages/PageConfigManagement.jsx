@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Card,
   Table,
@@ -86,6 +86,8 @@ export default function PageConfigManagement() {
   const [detectingColumns, setDetectingColumns] = useState(false);
   const [testingQuery, setTestingQuery] = useState(false);
   const [queryTestResult, setQueryTestResult] = useState(null);
+  const [draggingColumnIndex, setDraggingColumnIndex] = useState(null);
+  const [dragOverColumnIndex, setDragOverColumnIndex] = useState(null);
   const autoDetectRef = useRef('');
   const watchedSourceParams = Form.useWatch('source_params', form);
   const watchedColumns = Form.useWatch('columns', form);
@@ -142,6 +144,61 @@ export default function PageConfigManagement() {
     updatedValues[fieldIndex] = nextValue;
     form.setFieldsValue({ [listName]: updatedValues });
   };
+
+  const moveColumn = useCallback(
+    (sourceIndex, targetIndex) => {
+      if (sourceIndex === targetIndex) {
+        return;
+      }
+      const currentColumns = form.getFieldValue('columns') || [];
+      if (
+        sourceIndex == null ||
+        targetIndex == null ||
+        sourceIndex < 0 ||
+        targetIndex < 0 ||
+        sourceIndex >= currentColumns.length ||
+        targetIndex >= currentColumns.length
+      ) {
+        return;
+      }
+      const updated = [...currentColumns];
+      const [moved] = updated.splice(sourceIndex, 1);
+      updated.splice(targetIndex, 0, moved);
+      form.setFieldsValue({ columns: updated });
+    },
+    [form]
+  );
+
+  const handleColumnDragStart = useCallback((index) => {
+    setDraggingColumnIndex(index);
+  }, []);
+
+  const handleColumnDragEnter = useCallback(
+    (index) => {
+      if (draggingColumnIndex !== null && draggingColumnIndex !== index) {
+        setDragOverColumnIndex(index);
+      }
+    },
+    [draggingColumnIndex]
+  );
+
+  const handleColumnDragEnd = useCallback(() => {
+    setDraggingColumnIndex(null);
+    setDragOverColumnIndex(null);
+  }, []);
+
+  const handleColumnDrop = useCallback(
+    (targetIndex) => {
+      if (draggingColumnIndex === null) {
+        handleColumnDragEnd();
+        return;
+      }
+
+      moveColumn(draggingColumnIndex, targetIndex);
+      handleColumnDragEnd();
+    },
+    [draggingColumnIndex, moveColumn, handleColumnDragEnd]
+  );
 
   const handleDetectProcedureColumns = async (options = {}) => {
     const { silent = false } = options;
@@ -975,11 +1032,38 @@ export default function PageConfigManagement() {
         <Form.List name="columns">
           {(fields, { add, remove }) => (
             <>
-              {fields.map(({ key, name, ...restField }) => (
+              {fields.map(({ key, name, ...restField }, index) => (
                 <Card
                   key={key}
+                  role="listitem"
+                  draggable
+                  aria-grabbed={draggingColumnIndex === index}
+                  onDragStart={() => handleColumnDragStart(index)}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    handleColumnDragEnter(index);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    handleColumnDrop(index);
+                  }}
+                  onDragEnd={handleColumnDragEnd}
                   size="small"
-                  style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
+                  style={{
+                    marginBottom: token.marginMD,
+                    background:
+                      draggingColumnIndex === index
+                        ? token.colorPrimaryBg
+                        : dragOverColumnIndex === index
+                        ? token.colorFillSecondary
+                        : token.colorFillAlter,
+                    border:
+                      draggingColumnIndex === index
+                        ? `1px dashed ${token.colorPrimary}`
+                        : undefined,
+                    cursor: 'grab',
+                    transition: 'background 0.2s ease, border 0.2s ease',
+                  }}
                   extra={
                     <Button
                       type="text"
@@ -1062,6 +1146,9 @@ export default function PageConfigManagement() {
               >
                 Add Column
               </Button>
+              <Text type="secondary" style={{ display: 'block', marginTop: token.marginXS }}>
+                Drag column cards to reorder or use the delete icon to remove.
+              </Text>
             </>
           )}
         </Form.List>
