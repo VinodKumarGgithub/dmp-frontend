@@ -23,12 +23,13 @@ export default function DataTable({
     const maxVisibleColumns = 5;
     
     // If columns are specified in config, use them
+    // Note: config.columns already contains only visible columns (filtered by DataPage)
+    // So we should use ALL columns from config, not limit to 5
     if (config?.columns && Array.isArray(config.columns) && config.columns.length > 0) {
-      // Limit to max 5 visible columns
-      const visibleColumns = config.columns.slice(0, maxVisibleColumns);
-      const hasHidden = config.columns.length > maxVisibleColumns;
-      
-      const columns = visibleColumns.map((col) => ({
+      // Use all columns from config (they're already filtered by visibility in DataPage)
+      // Check if there are more columns in the original config that might be hidden
+      // by comparing with hasHiddenColumns prop
+      const columns = config.columns.map((col) => ({
         title: col.label || col.name,
         dataIndex: col.name,
         key: col.name,
@@ -44,7 +45,8 @@ export default function DataTable({
       }));
 
       // Only add "More" column if there are hidden columns
-      if (hasHidden || hasHiddenColumns) {
+      // hasHiddenColumns prop indicates if there are columns not shown in the table
+      if (hasHiddenColumns) {
         columns.push({
           title: 'More',
           key: 'more',

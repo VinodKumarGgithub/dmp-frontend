@@ -279,10 +279,18 @@ function DataPage() {
   // Compute hidden columns (columns not visible in the table) for the "View More" drawer
   const hiddenColumns = useMemo(() => {
     if (!config?.columns || !Array.isArray(config.columns)) return [];
-    if (columnSettings.length === 0) return []; // If no preferences, all columns are visible
     
+    // If no column settings, all columns are visible, so no hidden columns
+    if (columnSettings.length === 0) return [];
+    
+    // Build set of visible column names
     const visibleSet = new Set(visibleColumnNames);
-    return config.columns.filter((col) => !visibleSet.has(col.name));
+    
+    // Filter out columns that are in the visible set
+    // This handles the case where all columns are set to visible: true
+    const hidden = config.columns.filter((col) => !visibleSet.has(col.name));
+    
+    return hidden;
   }, [config?.columns, visibleColumnNames, columnSettings]);
 
   const handleColumnModalClose = useCallback(() => {
