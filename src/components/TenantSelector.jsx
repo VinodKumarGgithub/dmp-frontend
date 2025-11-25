@@ -24,19 +24,21 @@ export default function TenantSelector() {
   const handleTenantChange = (tenantId) => {
     setSelectedTenant(tenantId);
     
-    // Only invalidate tenant-specific queries, not all queries
-    // This prevents unnecessary re-renders of components that don't depend on tenant
+    // Invalidate all tenant-dependent queries when tenant changes
+    // This ensures fresh data is fetched for the new tenant context
     // Invalidate queries that are tenant-dependent:
     // - ['pages'] - pages list
-    // - ['pages', pageKey, ...] - page config and data
-    // - ['pagePreferences', pageKey] - page preferences
+    // - ['pages', pageKey, ...] - page config and data (all variants)
+    // - ['page-preferences', pageKey] - page preferences
+    // - ['db', ...] - database-related queries (tables, columns, indexes, procedures)
+    // - ['pageTenantAccess', ...] - page tenant access
     queryClient.invalidateQueries({ 
       predicate: (query) => {
         const queryKey = query.queryKey;
         if (Array.isArray(queryKey) && queryKey.length > 0) {
           const firstKey = queryKey[0];
-          // Invalidate tenant-dependent queries only
-          return ['pages', 'pagePreferences'].includes(firstKey);
+          // Invalidate all tenant-dependent queries
+          return ['pages', 'page-preferences', 'db', 'pageTenantAccess'].includes(firstKey);
         }
         return false;
       }
