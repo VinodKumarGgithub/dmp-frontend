@@ -38,6 +38,7 @@ const useAuthStore = create(
           const userData = {
             username: payload.username,
             role: payload.role,
+            organization_id: payload.organization_id || null,
             name: payload.name,
             email: payload.email,
             phone_number: payload.phone_number,

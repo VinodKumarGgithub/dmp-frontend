@@ -71,7 +71,7 @@ const { Option } = Select;
 
 export default function PageConfigManagement() {
   const { token } = antdTheme.useToken();
-  const { selectedTenant } = useAuth();
+  const { selectedTenant, user: currentUser } = useAuth();
   const { data: pagesData, isLoading } = usePages();
   const createMutation = useCreatePageConfig();
   const updateMutation = useUpdatePageConfig();
@@ -549,6 +549,10 @@ export default function PageConfigManagement() {
         is_download_allowed: isDownloadEnabled,
         download_row_limit: isDownloadEnabled ? resolvedDownloadLimit : null,
         page_size_default: values.page_size_default || 20,
+        // Auto-use organization_id: use from form if SUPER_ADMIN, otherwise use current user's org
+        organization_id: currentUser?.role === 'SUPER_ADMIN' 
+          ? (values.organization_id || null) 
+          : (currentUser?.organization_id || null),
       };
 
       if (editingPage) {
@@ -650,6 +654,22 @@ export default function PageConfigManagement() {
           >
             <Input placeholder="e.g., Age Edit Data" />
           </Form.Item>
+
+          {currentUser?.role === 'SUPER_ADMIN' && (
+            <Form.Item
+              name="organization_id"
+              label={
+                <Space>
+                  <span>Organization ID (Optional)</span>
+                  <Tooltip title="Leave empty for global pages, or specify an organization ID">
+                    <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                  </Tooltip>
+                </Space>
+              }
+            >
+              <Input placeholder="Leave empty for global pages" />
+            </Form.Item>
+          )}
 
           {!selectedTenant && (
             <Alert

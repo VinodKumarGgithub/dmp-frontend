@@ -19,8 +19,8 @@ export default function DeveloperRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  // Allow both ADMIN and DEVELOPER roles
-  if (user?.role !== 'ADMIN' && user?.role !== 'DEVELOPER') {
+  // Allow ADMIN, SUPER_ADMIN, and DEVELOPER roles
+  if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN' && user?.role !== 'DEVELOPER') {
     return (
       <div style={{ padding: 24 }}>
         <Card>

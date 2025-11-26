@@ -2,6 +2,7 @@ import HomePage from '../pages/HomePage';
 import LoginPage from '../pages/LoginPage';
 import PageConfigManagement from '../pages/PageConfigManagement';
 import UserManagement from '../pages/UserManagement';
+import TenantManagement from '../pages/TenantManagement';
 import ProfilePage from '../pages/ProfilePage';
 import DataPage from '../pages/DataPage';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -35,6 +36,13 @@ export const protectedRoutes = [
     element: <UserManagement />,
     label: 'User Management',
     key: 'users',
+    adminOnly: true,
+  },
+  {
+    path: '/tenants',
+    element: <TenantManagement />,
+    label: 'Tenant Management',
+    key: 'tenants',
     adminOnly: true,
   },
   {

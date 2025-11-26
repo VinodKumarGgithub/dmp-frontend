@@ -19,7 +19,7 @@ export default function AdminRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (user?.role !== 'ADMIN') {
+  if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
     return (
       <div style={{ padding: 24 }}>
         <Card>

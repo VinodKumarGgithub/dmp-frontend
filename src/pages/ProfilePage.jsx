@@ -165,6 +165,7 @@ export default function ProfilePage() {
 
   const getRoleColor = (role) => {
     const colors = {
+      SUPER_ADMIN: 'purple',
       ADMIN: 'red',
       MANAGER: 'orange',
       DEVELOPER: 'purple',
@@ -174,6 +175,7 @@ export default function ProfilePage() {
   };
 
   const getRoleIcon = (role) => {
+    if (role === 'SUPER_ADMIN') return <CrownOutlined />;
     if (role === 'ADMIN') return <CrownOutlined />;
     if (role === 'MANAGER') return <TeamOutlined />;
     return <UserOutlined />;
@@ -509,6 +511,15 @@ export default function ProfilePage() {
                 <Tag color={getRoleColor(profile?.role)} icon={getRoleIcon(profile?.role)}>
                   {profile?.role || 'USER'}
                 </Tag>
+                {profile?.organization_id ? (
+                  <Tag color="geekblue">
+                    Org: {profile.organization_id}
+                  </Tag>
+                ) : profile?.role === 'SUPER_ADMIN' ? (
+                  <Tag color="purple">
+                    All Organizations
+                  </Tag>
+                ) : null}
                 {profile?.email && (
                   <Tag icon={<MailOutlined />} color="blue">
                     {profile.email}
@@ -577,6 +588,15 @@ export default function ProfilePage() {
                 </Descriptions.Item>
                 <Descriptions.Item label="Phone Number">
                   {profile?.phone_number || <Text type="secondary">Not set</Text>}
+                </Descriptions.Item>
+                <Descriptions.Item label="Organization ID">
+                  {profile?.organization_id ? (
+                    <Tag color="geekblue">{profile.organization_id}</Tag>
+                  ) : profile?.role === 'SUPER_ADMIN' ? (
+                    <Tag color="purple">Super Admin (All Organizations)</Tag>
+                  ) : (
+                    <Text type="secondary">Not set</Text>
+                  )}
                 </Descriptions.Item>
                 <Descriptions.Item label="Role">
                   <Tag color={getRoleColor(profile?.role)} icon={getRoleIcon(profile?.role)}>

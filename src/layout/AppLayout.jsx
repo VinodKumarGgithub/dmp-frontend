@@ -42,12 +42,12 @@ function AppLayout({ children }) {
     ...protectedRoutes
       .filter((route) => route.label && route.key !== 'home')
       .filter((route) => {
-        // Only show admin routes to admin users
-        if (route.adminOnly && user?.role !== 'ADMIN') {
+        // Only show admin routes to admin or super admin users
+        if (route.adminOnly && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
           return false;
         }
-        // Show developer routes to admin or developer users
-        if (route.developerOnly && user?.role !== 'ADMIN' && user?.role !== 'DEVELOPER') {
+        // Show developer routes to admin, super admin, or developer users
+        if (route.developerOnly && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN' && user?.role !== 'DEVELOPER') {
           return false;
         }
         return true;
