@@ -3,6 +3,7 @@ import AppLayout from './layout/AppLayout';
 import { routes, publicRoutes } from './config/routes';
 import { useAuth } from './contexts/AuthContext';
 import LoadingScreen from './components/LoadingScreen';
+import UserOnboardingTour from './components/UserOnboardingTour';
 
 function AppContent() {
   const { isAuthenticated, loading, pagesLoading } = useAuth();
@@ -57,6 +58,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppContent />
+      <UserOnboardingTour />
     </BrowserRouter>
   );
 }

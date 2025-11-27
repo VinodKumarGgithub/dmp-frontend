@@ -9,6 +9,7 @@ import { logout as logoutApi } from '../api/auth';
 import TenantSelector from '../components/TenantSelector';
 import ThemeToggle from '../components/ThemeToggle';
 import PageSwitcher from '../components/PageSwitcher';
+import HelpCenter from '../components/HelpCenter';
 import { protectedRoutes } from '../config/routes';
 import { useOrganizationBranding } from '../hooks/useOrganizationBranding';
 import { getUserAvatarUrl } from '../utils/gravatar';
@@ -188,6 +189,8 @@ function AppLayout({ children }) {
         {children}
         {/* Floating page switcher - only show if there are pages configured */}
         {Array.isArray(pagesConfig) && pagesConfig.length > 0 && <PageSwitcher />}
+        {/* Help Center - always available */}
+        <HelpCenter />
       </div>
     </ProLayout>
   );
