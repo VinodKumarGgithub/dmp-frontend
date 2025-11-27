@@ -71,7 +71,10 @@ export default function LoginPage() {
       navigate('/');
     } catch (error) {
       // Error is already handled by login function via handleApiError
-      console.error('Login failed:', error);
+      // Only log in dev mode to avoid exposing sensitive error details
+      if (import.meta.env.DEV) {
+        console.error('Login failed:', error);
+      }
       setLoading(false);
     }
   };

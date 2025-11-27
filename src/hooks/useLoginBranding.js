@@ -134,7 +134,10 @@ function setCachedBranding(subdomain, brandingData, maskedOrgId = null) {
     localStorage.setItem(BRANDING_CACHE_KEY, JSON.stringify(cache));
   } catch (e) {
     // Ignore localStorage errors (quota exceeded, etc.)
-    console.warn('Failed to cache branding:', e);
+    // Only log in dev mode
+    if (import.meta.env.DEV) {
+      console.warn('Failed to cache branding:', e);
+    }
   }
 }
 

@@ -201,13 +201,14 @@ export default function TenantManagement() {
   };
 
   const columns = [
-    {
+    // Only show Tenant ID for SUPER_ADMIN
+    ...(isSuperAdmin ? [{
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
       width: 150,
       fixed: 'left',
-    },
+    }] : []),
     {
       title: 'Name',
       dataIndex: 'name',
@@ -523,9 +524,12 @@ export default function TenantManagement() {
       >
         {selectedTenant && (
           <Descriptions column={1} bordered>
-            <Descriptions.Item label="Tenant ID">
-              <Text strong>{selectedTenant.id}</Text>
-            </Descriptions.Item>
+            {/* Only show Tenant ID for SUPER_ADMIN */}
+            {isSuperAdmin && (
+              <Descriptions.Item label="Tenant ID">
+                <Text strong>{selectedTenant.id}</Text>
+              </Descriptions.Item>
+            )}
             <Descriptions.Item label="Name">
               {selectedTenant.name}
             </Descriptions.Item>

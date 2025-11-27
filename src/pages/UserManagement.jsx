@@ -241,14 +241,17 @@ export default function UserManagement() {
     setSelectedUser(null);
   };
 
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+
   const columns = [
-    {
+    // Only show User ID for SUPER_ADMIN
+    ...(isSuperAdmin ? [{
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
       width: 70,
       fixed: 'left',
-    },
+    }] : []),
     {
       title: 'Username',
       dataIndex: 'username',
@@ -760,9 +763,12 @@ export default function UserManagement() {
               background: token.colorBgContainer,
             }}
           >
-            <Descriptions.Item label="ID">
-              {selectedUser.id}
-            </Descriptions.Item>
+            {/* Only show User ID for SUPER_ADMIN */}
+            {isSuperAdmin && (
+              <Descriptions.Item label="ID">
+                {selectedUser.id}
+              </Descriptions.Item>
+            )}
             <Descriptions.Item label="Username">
               {selectedUser.username}
             </Descriptions.Item>
