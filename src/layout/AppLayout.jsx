@@ -10,7 +10,7 @@ import TenantSelector from '../components/TenantSelector';
 import ThemeToggle from '../components/ThemeToggle';
 import PageSwitcher from '../components/PageSwitcher';
 import { protectedRoutes } from '../config/routes';
-import useAppConfigStore from '../stores/appConfigStore';
+import { useOrganizationBranding } from '../hooks/useOrganizationBranding';
 import { getUserAvatarUrl } from '../utils/gravatar';
 
 function AppLayout({ children }) {
@@ -21,8 +21,7 @@ function AppLayout({ children }) {
   const logout = useAuthStore((state) => state.logout);
   const queryClient = useQueryClient();
   const { token } = theme.useToken();
-  const getAppName = useAppConfigStore((state) => state.getAppName);
-  const getAppShortName = useAppConfigStore((state) => state.getAppShortName);
+  const branding = useOrganizationBranding();
 
   const handleLogout = () => {
     logout(logoutApi, queryClient);
@@ -129,8 +128,16 @@ function AppLayout({ children }) {
 
   return (
     <ProLayout
-      title={getAppName()}
-      logo={<div style={{ color: token.colorText, fontWeight: token.fontWeightStrong }}>{getAppShortName()}</div>}
+      title={branding.appName}
+      logo={branding.logoUrl ? (
+        <img 
+          src={branding.logoUrl} 
+          alt={branding.appName}
+          style={{ height: 32, objectFit: 'contain' }}
+        />
+      ) : (
+        <div style={{ color: token.colorText, fontWeight: token.fontWeightStrong }}>{branding.appShortName}</div>
+      )}
       location={{
         pathname: location.pathname,
       }}

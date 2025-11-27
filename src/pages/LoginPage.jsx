@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Form, Input, Button, Typography, Space, Card, theme, Divider } from 'antd';
+import { Form, Input, Button, Typography, Space, Card, theme, Divider, ConfigProvider } from 'antd';
 import { UserOutlined, LockOutlined, SafetyOutlined, DatabaseOutlined, ThunderboltOutlined, AppstoreOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
-import useAppConfigStore from '../stores/appConfigStore';
+import { useLoginBranding } from '../hooks/useLoginBranding';
 
 const { Title, Text } = Typography;
 
@@ -15,7 +15,14 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { token } = theme.useToken();
   const { isDark } = useTheme();
-  const getAppName = useAppConfigStore((state) => state.getAppName);
+  const branding = useLoginBranding();
+  
+  // Apply primary color to theme
+  const themeConfig = branding.primaryColor ? {
+    token: {
+      colorPrimary: branding.primaryColor,
+    }
+  } : {};
   
   // Calculate glassy colors based on theme - premium glassmorphism for both modes
   const glassBg = isDark 
@@ -70,15 +77,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        minHeight: '100vh',
-        background: token.colorBgLayout,
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
+    <ConfigProvider theme={themeConfig}>
+      <div
+        style={{
+          display: 'flex',
+          minHeight: '100vh',
+          background: token.colorBgLayout,
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
       {/* Enhanced background with gradient */}
       <div
         style={{
@@ -186,6 +194,17 @@ export default function LoginPage() {
                     }}
                   />
                 </div>
+                {branding.logoUrl && (
+                  <img 
+                    src={branding.logoUrl} 
+                    alt={branding.appName}
+                    style={{
+                      height: 60,
+                      marginBottom: token.marginMD,
+                      objectFit: 'contain',
+                    }}
+                  />
+                )}
                 <Title
                   level={1}
                   style={{
@@ -195,7 +214,7 @@ export default function LoginPage() {
                     fontSize: '2.5rem',
                   }}
                 >
-                  {getAppName()}
+                  {branding.appName}
                 </Title>
                 <Text
                   style={{
@@ -659,6 +678,7 @@ export default function LoginPage() {
           transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
       `}</style>
-    </div>
+      </div>
+    </ConfigProvider>
   );
 }

@@ -3,6 +3,7 @@ import LoginPage from '../pages/LoginPage';
 import PageConfigManagement from '../pages/PageConfigManagement';
 import UserManagement from '../pages/UserManagement';
 import TenantManagement from '../pages/TenantManagement';
+import OrganizationManagement from '../pages/OrganizationManagement';
 import ProfilePage from '../pages/ProfilePage';
 import DataPage from '../pages/DataPage';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -43,6 +44,13 @@ export const protectedRoutes = [
     element: <TenantManagement />,
     label: 'Tenant Management',
     key: 'tenants',
+    adminOnly: true,
+  },
+  {
+    path: '/organizations',
+    element: <OrganizationManagement />,
+    label: 'Organization Management',
+    key: 'organizations',
     adminOnly: true,
   },
   {

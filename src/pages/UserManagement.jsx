@@ -171,7 +171,7 @@ export default function UserManagement() {
         const organizationId = currentUser?.role === 'SUPER_ADMIN' 
           ? (values.organization_id !== undefined ? (values.organization_id || null) : editingUser.organization_id)
           : editingUser.organization_id;  // Non-SUPER_ADMIN can't change organization_id
-        
+
         const updateData = {
           role: values.role || editingUser.role,
           organization_id: organizationId,
@@ -787,13 +787,6 @@ export default function UserManagement() {
                 </Space>
               ) : (
                 '-'
-              )}
-            </Descriptions.Item>
-            <Descriptions.Item label="Organization ID">
-              {selectedUser.organization_id ? (
-                <Tag color="geekblue">{selectedUser.organization_id}</Tag>
-              ) : (
-                <Tag color="purple">Super Admin (All Organizations)</Tag>
               )}
             </Descriptions.Item>
             <Descriptions.Item label="Role">

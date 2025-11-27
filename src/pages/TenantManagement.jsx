@@ -57,6 +57,7 @@ export default function TenantManagement() {
   const [form] = Form.useForm();
 
   const tenants = tenantsData?.data || (Array.isArray(tenantsData) ? tenantsData : []);
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
 
   const getStatusColor = (status) => {
     const colors = {
@@ -214,13 +215,6 @@ export default function TenantManagement() {
       width: 200,
     },
     {
-      title: 'Organization ID',
-      dataIndex: 'organization_id',
-      key: 'organization_id',
-      width: 150,
-      render: (orgId) => orgId || <Tag color="default">N/A</Tag>,
-    },
-    {
       title: 'Database',
       key: 'database',
       width: 200,
@@ -229,18 +223,25 @@ export default function TenantManagement() {
           <Tag color={record.dialect === 'mysql' ? 'blue' : 'purple'}>
             {record.dialect?.toUpperCase() || 'MySQL'}
           </Tag>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            {record.db_host}:{record.db_port}
-          </Text>
+          {isSuperAdmin ? (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              {record.db_host}:{record.db_port}
+            </Text>
+          ) : (
+            <Text type="secondary" style={{ fontSize: 12 }}>
+              Connected
+            </Text>
+          )}
         </Space>
       ),
     },
-    {
+    // Only show database name for SUPER_ADMIN
+    ...(isSuperAdmin ? [{
       title: 'Database Name',
       dataIndex: 'db_name',
       key: 'db_name',
       width: 150,
-    },
+    }] : []),
     {
       title: 'Status',
       dataIndex: 'status',
@@ -528,30 +529,28 @@ export default function TenantManagement() {
             <Descriptions.Item label="Name">
               {selectedTenant.name}
             </Descriptions.Item>
-            <Descriptions.Item label="Organization ID">
-              {selectedTenant.organization_id ? (
-                <Tag color="geekblue">{selectedTenant.organization_id}</Tag>
-              ) : (
-                <Tag color="default">N/A</Tag>
-              )}
-            </Descriptions.Item>
             <Descriptions.Item label="Database Type">
               <Tag color={selectedTenant.dialect === 'mysql' ? 'blue' : 'purple'}>
                 {selectedTenant.dialect?.toUpperCase() || 'MySQL'}
               </Tag>
             </Descriptions.Item>
-            <Descriptions.Item label="Database Host">
-              {selectedTenant.db_host}
-            </Descriptions.Item>
-            <Descriptions.Item label="Database Port">
-              {selectedTenant.db_port || 3306}
-            </Descriptions.Item>
-            <Descriptions.Item label="Database Name">
-              {selectedTenant.db_name}
-            </Descriptions.Item>
-            <Descriptions.Item label="Database Username">
-              {selectedTenant.db_user}
-            </Descriptions.Item>
+            {/* Only show database credentials for SUPER_ADMIN */}
+            {isSuperAdmin && (
+              <>
+                <Descriptions.Item label="Database Host">
+                  {selectedTenant.db_host}
+                </Descriptions.Item>
+                <Descriptions.Item label="Database Port">
+                  {selectedTenant.db_port || 3306}
+                </Descriptions.Item>
+                <Descriptions.Item label="Database Name">
+                  {selectedTenant.db_name}
+                </Descriptions.Item>
+                <Descriptions.Item label="Database Username">
+                  {selectedTenant.db_user}
+                </Descriptions.Item>
+              </>
+            )}
             <Descriptions.Item label="Status">
               <Tag color={getStatusColor(selectedTenant.status)}>
                 {selectedTenant.status}
