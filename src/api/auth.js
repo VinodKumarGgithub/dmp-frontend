@@ -5,22 +5,33 @@ import { handleApiError, showSuccess } from '../utils/errorHandler';
  * Login user with username and password
  * @param {string} username
  * @param {string} password
- * @returns {Promise<{token: string}>}
+ * @param {boolean} hasBranding - Whether client already has branding cached
+ * @returns {Promise<{token: string, branding?: object}>}
  */
-export async function login(username, password) {
+export async function login(username, password, hasBranding = false) {
   try {
     const response = await axiosInstance.post('/auth/login', {
       username,
       password,
+    }, {
+      headers: {
+        'x-has-branding': hasBranding ? 'true' : 'false'
+      }
     });
 
-    // Backend returns { success: true, data: { token } }
-    const token = response.data?.token || response.token;
+    // Backend returns { success: true, data: { token, branding? } }
+    const data = response.data?.data || response.data || response;
+    const token = data.token || response.token;
     
     if (token) {
       localStorage.setItem('token', token);
       showSuccess('Login successful!');
-      return { token };
+      
+      // Return both token and branding (if provided)
+      return {
+        token,
+        branding: data.branding || null
+      };
     }
 
     throw new Error('No token received from server');

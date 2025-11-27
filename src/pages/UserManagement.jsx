@@ -77,16 +77,23 @@ export default function UserManagement() {
   }));
 
   const effectiveRole = roleWatch || editingUser?.role || 'USER';
-  const isTenantRequired = effectiveRole !== 'ADMIN' && effectiveRole !== 'MANAGER';
+  const isTenantRequired = effectiveRole !== 'ADMIN' && effectiveRole !== 'SUPER_ADMIN' && effectiveRole !== 'MANAGER';
 
   const handleAdd = () => {
     setEditingUser(null);
     form.resetFields();
-    form.setFieldsValue({
+    // Auto-set organization_id for non-SUPER_ADMIN users
+    const initialValues = {
       role: 'USER',
       tenantIds: [],
       pageKeys: [],
-    });
+    };
+    if (currentUser?.role !== 'SUPER_ADMIN' && currentUser?.organization_id) {
+      initialValues.organization_id = currentUser.organization_id;
+    } else {
+      initialValues.organization_id = null;
+    }
+    form.setFieldsValue(initialValues);
     setIsModalOpen(true);
   };
 
@@ -98,6 +105,7 @@ export default function UserManagement() {
       email: user.email,
       phone_number: user.phone_number,
       role: user.role,
+      organization_id: user.organization_id || null,
       tenantIds: user.tenant_permissions || [],
       pageKeys: user.page_permissions || [],
     });
@@ -158,8 +166,15 @@ export default function UserManagement() {
           return;
         }
 
+        // For non-SUPER_ADMIN users, preserve the existing organization_id (can't change it)
+        // For SUPER_ADMIN, allow changing organization_id
+        const organizationId = currentUser?.role === 'SUPER_ADMIN' 
+          ? (values.organization_id !== undefined ? (values.organization_id || null) : editingUser.organization_id)
+          : editingUser.organization_id;  // Non-SUPER_ADMIN can't change organization_id
+
         const updateData = {
           role: values.role || editingUser.role,
+          organization_id: organizationId,
           tenantIds: values.tenantIds || [],
           pageKeys: values.pageKeys || [],
         };
@@ -182,10 +197,21 @@ export default function UserManagement() {
           data: updateData,
         });
       } else {
-        if (values.role !== 'ADMIN' && values.role !== 'MANAGER' && (!values.tenantIds || values.tenantIds.length === 0)) {
+        if (values.role !== 'ADMIN' && values.role !== 'SUPER_ADMIN' && values.role !== 'MANAGER' && (!values.tenantIds || values.tenantIds.length === 0)) {
           message.warning('Please assign at least one tenant');
           return;
         }
+        
+        // Auto-use current user's organization_id for non-SUPER_ADMIN creators
+        const organizationId = currentUser?.role === 'SUPER_ADMIN' 
+          ? (values.organization_id || null)  // SUPER_ADMIN can choose
+          : (currentUser?.organization_id || null);  // Regular users use their own org
+        
+        if (values.role !== 'SUPER_ADMIN' && !organizationId) {
+          message.warning('Organization ID is required for non-SUPER_ADMIN users');
+          return;
+        }
+        
         await createMutation.mutateAsync({
           username: values.username,
           password: values.password,
@@ -193,6 +219,7 @@ export default function UserManagement() {
           email: values.email || null,
           phone_number: values.phone_number || null,
           role: values.role || 'USER',
+          organization_id: organizationId,  // Use auto-determined value
           tenantIds: values.tenantIds || [],
           pageKeys: values.pageKeys || [],
         });
@@ -214,14 +241,17 @@ export default function UserManagement() {
     setSelectedUser(null);
   };
 
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+
   const columns = [
-    {
+    // Only show User ID for SUPER_ADMIN
+    ...(isSuperAdmin ? [{
       title: 'ID',
       dataIndex: 'id',
       key: 'id',
       width: 70,
       fixed: 'left',
-    },
+    }] : []),
     {
       title: 'Username',
       dataIndex: 'username',
@@ -252,6 +282,7 @@ export default function UserManagement() {
       width: 120,
       render: (role) => {
         const colorMap = {
+          SUPER_ADMIN: 'purple',
           ADMIN: 'red',
           MANAGER: 'orange',
           DEVELOPER: 'geekblue',
@@ -266,7 +297,7 @@ export default function UserManagement() {
       key: 'tenant_permissions',
       width: 150,
       render: (tenantPermissions = [], record) => {
-        if ((record.role === 'ADMIN' || record.role === 'MANAGER' || record.role === 'DEVELOPER') && tenantPermissions.length === 0) {
+        if ((record.role === 'SUPER_ADMIN' || record.role === 'ADMIN' || record.role === 'MANAGER' || record.role === 'DEVELOPER') && tenantPermissions.length === 0) {
           return <Tag color="green">All</Tag>;
         }
         if (!tenantPermissions || tenantPermissions.length === 0) {
@@ -329,7 +360,7 @@ export default function UserManagement() {
               onClick={() => handleEdit(record)}
             />
           </Tooltip>
-          {record.username !== currentUser?.username && record.role !== 'ADMIN' && (
+          {record.username !== currentUser?.username && record.role !== 'ADMIN' && record.role !== 'SUPER_ADMIN' && (
             <>
               {record.is_blocked ? (
                 <Popconfirm
@@ -525,6 +556,10 @@ export default function UserManagement() {
             initialValue="USER"
           >
             <Select placeholder="Select role">
+              {/* Show SUPER_ADMIN option only if current user is SUPER_ADMIN (can create/update) or if editing a SUPER_ADMIN user (to see current role) */}
+              {(currentUser?.role === 'SUPER_ADMIN' || editingUser?.role === 'SUPER_ADMIN') && (
+                <Select.Option value="SUPER_ADMIN">Super Admin (All Organizations)</Select.Option>
+              )}
               <Select.Option value="ADMIN">Admin</Select.Option>
               <Select.Option value="MANAGER">Manager</Select.Option>
               <Select.Option value="DEVELOPER">Developer</Select.Option>
@@ -570,10 +605,36 @@ export default function UserManagement() {
             </Form.Item>
           )}
 
-          {effectiveRole === 'ADMIN' || effectiveRole === 'MANAGER' ? (
+          {currentUser?.role === 'SUPER_ADMIN' && (
+            <Form.Item
+              name="organization_id"
+              label={
+                <Space>
+                  <span>Organization ID</span>
+                  <Tooltip title="Super Admin can specify organization ID or leave empty for all organizations">
+                    <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                  </Tooltip>
+                </Space>
+              }
+              rules={[
+                {
+                  required: false,  // Optional for SUPER_ADMIN
+                  message: 'Organization ID is optional for Super Admin',
+                },
+              ]}
+            >
+              <Input
+                placeholder="Leave empty for Super Admin (all organizations) or specify organization ID"
+              />
+            </Form.Item>
+          )}
+
+          {effectiveRole === 'ADMIN' || effectiveRole === 'SUPER_ADMIN' || effectiveRole === 'MANAGER' ? (
             <Alert
               message="Full Access"
-              description="Admin and Manager roles have access to all tenants and pages. No restrictions needed."
+              description={effectiveRole === 'SUPER_ADMIN' 
+                ? "Super Admin has access to all organizations, tenants, and pages."
+                : "Admin and Manager roles have access to all tenants and pages within their organization. No restrictions needed."}
               type="info"
               showIcon
               style={{ marginBottom: token.marginMD }}
@@ -702,9 +763,12 @@ export default function UserManagement() {
               background: token.colorBgContainer,
             }}
           >
-            <Descriptions.Item label="ID">
-              {selectedUser.id}
-            </Descriptions.Item>
+            {/* Only show User ID for SUPER_ADMIN */}
+            {isSuperAdmin && (
+              <Descriptions.Item label="ID">
+                {selectedUser.id}
+              </Descriptions.Item>
+            )}
             <Descriptions.Item label="Username">
               {selectedUser.username}
             </Descriptions.Item>
@@ -733,6 +797,7 @@ export default function UserManagement() {
             </Descriptions.Item>
             <Descriptions.Item label="Role">
               <Tag color={
+                selectedUser.role === 'SUPER_ADMIN' ? 'purple' :
                 selectedUser.role === 'ADMIN' ? 'red' :
                 selectedUser.role === 'MANAGER' ? 'orange' :
                 selectedUser.role === 'DEVELOPER' ? 'geekblue' :
@@ -765,7 +830,7 @@ export default function UserManagement() {
             <Descriptions.Item label="Tenant Access">
               {(() => {
                 const tenantPermissions = selectedUser.tenant_permissions || [];
-                if ((selectedUser.role === 'ADMIN' || selectedUser.role === 'MANAGER' || selectedUser.role === 'DEVELOPER') && tenantPermissions.length === 0) {
+                if ((selectedUser.role === 'SUPER_ADMIN' || selectedUser.role === 'ADMIN' || selectedUser.role === 'MANAGER' || selectedUser.role === 'DEVELOPER') && tenantPermissions.length === 0) {
                   return <Tag color="green">All Tenants</Tag>;
                 }
                 if (tenantPermissions.length === 0) {

@@ -9,6 +9,7 @@ import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import { handleApiError } from './utils/errorHandler';
 import LoadingScreen from './components/LoadingScreen';
 import { DEFAULT_FONT } from './utils/fontLoader';
+import { useOrganizationBranding } from './hooks/useOrganizationBranding';
 import 'antd/dist/reset.css';
 
 // Configure Ant Design message to show only one toast at a time
@@ -63,13 +64,17 @@ function ThemeConfigWrapper({ children }) {
   const { algorithm, fontFamily } = useTheme();
   const currentFont = fontFamily || DEFAULT_FONT;
   
+  // Use the hook for consistent branding and caching
+  const branding = useOrganizationBranding();
+  const primaryColor = branding.primaryColor || '#1890ff';
+  
   return (
     <ConfigProvider
       locale={enUS}
       theme={{
         algorithm,
         token: {
-          colorPrimary: '#1890ff',
+          colorPrimary: primaryColor,
           borderRadius: 6,
           fontFamily: `"${currentFont}", -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif`,
         },

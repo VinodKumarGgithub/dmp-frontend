@@ -92,15 +92,17 @@ axiosInstance.interceptors.response.use(
       message.error(formattedMessage, duration);
     }
 
-    // Log error for debugging
-    console.error('API Error:', {
-      code: errorCode,
-      message: rawMessage,
-      formattedMessage: formattedMessage,
-      details: errorDetails,
-      status: error.response?.status,
-      url: error.config?.url,
-    });
+    // Log error for debugging (sanitized - don't expose sensitive URLs/details in production)
+    if (import.meta.env.DEV) {
+      console.error('API Error:', {
+        code: errorCode,
+        message: rawMessage,
+        formattedMessage: formattedMessage,
+        status: error.response?.status,
+        // Only log URL in dev mode, sanitize in production
+        url: error.config?.url,
+      });
+    }
 
     // Return a consistent error format
     return Promise.reject({

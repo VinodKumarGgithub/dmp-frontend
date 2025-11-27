@@ -165,6 +165,7 @@ export default function ProfilePage() {
 
   const getRoleColor = (role) => {
     const colors = {
+      SUPER_ADMIN: 'purple',
       ADMIN: 'red',
       MANAGER: 'orange',
       DEVELOPER: 'purple',
@@ -174,6 +175,7 @@ export default function ProfilePage() {
   };
 
   const getRoleIcon = (role) => {
+    if (role === 'SUPER_ADMIN') return <CrownOutlined />;
     if (role === 'ADMIN') return <CrownOutlined />;
     if (role === 'MANAGER') return <TeamOutlined />;
     return <UserOutlined />;
@@ -509,6 +511,11 @@ export default function ProfilePage() {
                 <Tag color={getRoleColor(profile?.role)} icon={getRoleIcon(profile?.role)}>
                   {profile?.role || 'USER'}
                 </Tag>
+                {profile?.role === 'SUPER_ADMIN' ? (
+                  <Tag color="purple">
+                    All Organizations
+                  </Tag>
+                ) : null}
                 {profile?.email && (
                   <Tag icon={<MailOutlined />} color="blue">
                     {profile.email}
