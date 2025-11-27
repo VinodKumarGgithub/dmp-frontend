@@ -4,6 +4,7 @@ import PageConfigManagement from '../pages/PageConfigManagement';
 import UserManagement from '../pages/UserManagement';
 import TenantManagement from '../pages/TenantManagement';
 import OrganizationManagement from '../pages/OrganizationManagement';
+import AuditLogPage from '../pages/AuditLogPage';
 import ProfilePage from '../pages/ProfilePage';
 import DataPage from '../pages/DataPage';
 import ProtectedRoute from '../components/ProtectedRoute';
@@ -51,6 +52,13 @@ export const protectedRoutes = [
     element: <OrganizationManagement />,
     label: 'Organization Management',
     key: 'organizations',
+    adminOnly: true,
+  },
+  {
+    path: '/audit-logs',
+    element: <AuditLogPage />,
+    label: 'Audit Logs',
+    key: 'audit-logs',
     adminOnly: true,
   },
   {
