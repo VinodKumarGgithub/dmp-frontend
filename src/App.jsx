@@ -33,19 +33,21 @@ function AppContent() {
     return <Navigate to="/" replace />;
   }
 
-  // Render public routes without layout
-  if (isPublicRoute) {
+  // Render public routes without layout (for unauthenticated users)
+  if (!isAuthenticated && isPublicRoute) {
     return (
       <Routes>
         {publicRoutes.map((route) => (
           <Route key={route.key} path={route.path} element={route.element} />
         ))}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
   }
 
-  // Render protected routes with layout
+  // Render protected routes with layout (for authenticated users)
+  // Authenticated users should see HomePage at /, not LandingPage
+  if (isAuthenticated) {
   return (
     <AppLayout>
       <Routes>
@@ -58,6 +60,10 @@ function AppContent() {
       </Routes>
     </AppLayout>
   );
+  }
+
+  // Fallback: redirect unauthenticated users to landing page
+  return <Navigate to="/" replace />;
 }
 
 export default function App() {

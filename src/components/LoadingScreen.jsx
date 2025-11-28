@@ -232,7 +232,7 @@ export default function LoadingScreen({ isLoading = true }) {
       {/* Premium Progress Percentage with Glow */}
       <div
         style={{
-          marginTop: token.marginXXL,
+          marginTop: token.marginXL,
           fontSize: token.fontSizeHeading4,
           color: token.colorTextSecondary,
           fontWeight: token.fontWeightStrong,

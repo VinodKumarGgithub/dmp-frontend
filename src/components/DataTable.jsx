@@ -193,7 +193,7 @@ export default function DataTable({
   // Show empty state
   if (!Array.isArray(data) || data.length === 0) {
     return (
-      <Card style={{ textAlign: 'center', padding: token.paddingXXL }}>
+      <Card style={{ textAlign: 'center', padding: token.paddingXL }}>
         <FileTextOutlined
           style={{ fontSize: 48, color: token.colorTextSecondary, marginBottom: token.marginMD }}
         />

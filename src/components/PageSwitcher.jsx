@@ -118,7 +118,7 @@ export default function PageSwitcher() {
                 backgroundColor: isActive ? token.colorPrimaryBg : 'transparent',
                 borderRadius: token.borderRadius,
                 padding: token.paddingXS,
-                marginBottom: token.marginXXS,
+                marginBottom: token.marginXS,
               }}
               onClick={() => handlePageClick(page.page_key)}
             >

@@ -152,7 +152,7 @@ export default function LoginPage() {
             display: 'flex',
             width: '100%',
             maxWidth: 1000,
-            gap: token.marginXXL,
+            gap: token.marginXL,
             alignItems: 'center',
           }}
         >
@@ -162,41 +162,11 @@ export default function LoginPage() {
               flex: 1,
               display: isMobile ? 'none' : 'block',
               color: token.colorText,
-              padding: token.paddingXXL,
+              padding: token.paddingXL,
             }}
           >
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
               <div>
-                <div
-                  className="icon-container-large icon-blazing"
-                  style={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 16,
-                    background: isDark 
-                      ? glassBgLight 
-                      : `linear-gradient(135deg, rgba(0, 0, 0, 0.03), rgba(0, 0, 0, 0.05))`,
-                    backdropFilter: 'blur(10px)',
-                    border: `1px solid ${isDark ? glassBorderLight : token.colorBorder}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    marginBottom: token.marginMD,
-                    boxShadow: isDark ? 'none' : '0 4px 12px rgba(0, 0, 0, 0.06)',
-                    position: 'relative',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <DatabaseOutlined
-                    className="icon-blazing-shine"
-                    style={{
-                      fontSize: 40,
-                      color: token.colorText,
-                      position: 'relative',
-                      zIndex: 1,
-                    }}
-                  />
-                </div>
                 {branding.logoUrl && (
                   <img 
                     src={branding.logoUrl} 
@@ -389,7 +359,7 @@ export default function LoginPage() {
               boxShadow: cardShadow,
               transition: 'all 0.3s ease',
             }}
-            bodyStyle={{ padding: token.paddingXXL }}
+            bodyStyle={{ padding: token.paddingXL }}
           >
             <Space direction="vertical" size="large" style={{ width: '100%' }}>
               <div style={{ textAlign: 'center' }}>

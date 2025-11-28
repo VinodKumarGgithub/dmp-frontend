@@ -1,5 +1,6 @@
 import HomePage from '../pages/HomePage';
 import LoginPage from '../pages/LoginPage';
+import LandingPage from '../pages/LandingPage';
 import PageConfigManagement from '../pages/PageConfigManagement';
 import UserManagement from '../pages/UserManagement';
 import TenantManagement from '../pages/TenantManagement';
@@ -13,6 +14,11 @@ import AdminRoute from '../components/AdminRoute';
 import DeveloperRoute from '../components/DeveloperRoute';
 
 export const publicRoutes = [
+  {
+    path: '/',
+    element: <LandingPage />,
+    key: 'landing',
+  },
   {
     path: '/login',
     element: <LoginPage />,

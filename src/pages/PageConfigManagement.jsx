@@ -1113,7 +1113,7 @@ export default function PageConfigManagement() {
                               <Space>
                                 <span>{col.label || col.name}</span>
                                 {col.label && col.label !== col.name && (
-                                  <Text type="secondary" style={{ marginLeft: token.marginXXS }}>
+                                  <Text type="secondary" style={{ marginLeft: token.marginXS }}>
                                     ({col.name})
                                   </Text>
                                 )}
@@ -1356,7 +1356,7 @@ export default function PageConfigManagement() {
                                         <Space>
                                           <span>{col.label || col.name}</span>
                                           {col.label && col.label !== col.name && (
-                                            <Text type="secondary" style={{ marginLeft: token.marginXXS }}>
+                                            <Text type="secondary" style={{ marginLeft: token.marginXS }}>
                                               ({col.name})
                                             </Text>
                                           )}
