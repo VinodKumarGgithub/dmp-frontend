@@ -31,19 +31,24 @@ import {
   PhoneOutlined,
   MoreOutlined,
   UnlockOutlined,
+  SafetyOutlined,
+  ArrowRightOutlined,
 } from '@ant-design/icons';
 import { useUsers, useCreateUser, useUpdateUser, useDeleteUser } from '../api/users';
 import { useBlockUser, useUnblockUser } from '../api/admin';
 import { useTenants } from '../api/tenants';
 import { usePages } from '../api/pages';
 import { useAuth } from '../contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { Title, Text } = Typography;
 
 export default function UserManagement() {
   const { token } = antdTheme.useToken();
   const { user: currentUser } = useAuth();
+  const navigate = useNavigate();
+  const { isDark } = useTheme();
   const { data: usersData, isLoading } = useUsers();
   const createMutation = useCreateUser();
   const updateMutation = useUpdateUser();
@@ -447,6 +452,41 @@ export default function UserManagement() {
             Add New User
           </Button>
         </div>
+
+        {/* Role Reference Card */}
+        <Alert
+          message={
+            <Space>
+              <SafetyOutlined />
+              <span>Need help understanding roles and permissions?</span>
+              <Button
+                type="link"
+                icon={<ArrowRightOutlined />}
+                onClick={() => navigate('/roles-access')}
+                style={{ padding: 0, height: 'auto' }}
+              >
+                View Roles & Access Guide
+              </Button>
+            </Space>
+          }
+          type="info"
+          showIcon={false}
+          style={{
+            marginBottom: token.marginLG,
+            borderRadius: 12,
+            background: isDark
+              ? 'rgba(30, 30, 30, 0.85)'
+              : 'rgba(255, 255, 255, 0.9)',
+            backdropFilter: 'blur(20px) saturate(180%)',
+            WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+            border: isDark
+              ? '1px solid rgba(255, 255, 255, 0.1)'
+              : '1px solid rgba(24, 144, 255, 0.2)',
+            boxShadow: isDark
+              ? '0 8px 32px 0 rgba(0, 0, 0, 0.37), 0 0 0 1px rgba(255, 255, 255, 0.05)'
+              : '0 8px 32px 0 rgba(31, 38, 135, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.5)',
+          }}
+        />
 
         <Table
           columns={columns}

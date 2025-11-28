@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import React from 'react';
 import {
   FloatButton,
@@ -14,16 +14,20 @@ import {
   Collapse,
   Button,
   Divider,
+  Row,
+  Col,
 } from 'antd';
 import {
   QuestionCircleOutlined,
   SearchOutlined,
   CloseOutlined,
-  RocketOutlined,
+  SafetyOutlined,
 } from '@ant-design/icons';
 import { getHelpContentByRole, getSearchableHelpItems } from '../data/helpContent';
 import useAuthStore from '../stores/authStore';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
+import { theme as antdTheme } from 'antd';
 
 const { Title, Paragraph, Text } = Typography;
 const { Panel } = Collapse;
@@ -36,6 +40,8 @@ export default function HelpCenter() {
   const user = useAuthStore((state) => state.user);
   const userRole = user?.role || 'USER';
   const navigate = useNavigate();
+  const { isDark } = useTheme();
+  const { token } = antdTheme.useToken();
 
   // Get role-filtered content
   const helpContent = useMemo(
@@ -97,26 +103,23 @@ export default function HelpCenter() {
     setSearchText('');
   };
 
-  const handleRestartTour = () => {
-    // Clear tour completion flag
-    const tourKey = `hasSeenTour_${userRole}`;
-    localStorage.removeItem(tourKey);
-    
-    // Close help center
-    setOpen(false);
-    
-    // Navigate to home and trigger tour
-    if (window.location.pathname !== '/') {
-      navigate('/');
-      // Small delay to ensure navigation completes
-      setTimeout(() => {
-        window.location.reload();
-      }, 100);
-    } else {
-      // If already on home, reload to trigger tour
-      window.location.reload();
-    }
-  };
+  // Listen for custom event from GlobalSearch to open Help Center with specific item
+  useEffect(() => {
+    const handleOpenHelpCenter = (event) => {
+      const { item } = event.detail || {};
+      if (item) {
+        setOpen(true);
+        setSelectedItem(item);
+        setSelectedCategory(item.categoryId);
+        setSearchText(''); // Clear search when opening from global search
+      }
+    };
+
+    window.addEventListener('openHelpCenter', handleOpenHelpCenter);
+    return () => {
+      window.removeEventListener('openHelpCenter', handleOpenHelpCenter);
+    };
+  }, []);
 
   const categories = Object.values(helpContent);
 
@@ -208,29 +211,79 @@ export default function HelpCenter() {
         ) : (
           // List view
           <div>
-            <Space direction="vertical" size="middle" style={{ width: '100%', marginBottom: 24 }}>
-              <Button
-                type="primary"
-                icon={<RocketOutlined />}
-                onClick={handleRestartTour}
-                block
-                style={{
-                  height: 48,
-                  fontSize: 15,
-                  fontWeight: 500,
-                }}
-              >
-                🚀 Restart Interactive Tour Guide
-              </Button>
-              <Input
-                placeholder="Search help articles..."
-                prefix={<SearchOutlined />}
-                value={searchText}
-                onChange={(e) => setSearchText(e.target.value)}
-                size="large"
-                allowClear
-              />
-            </Space>
+            <Input
+              placeholder="Search help articles..."
+              prefix={<SearchOutlined />}
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              size="large"
+              allowClear
+              style={{ marginBottom: 24 }}
+            />
+
+            {/* Quick Links Section - Only show when not searching and user is admin */}
+            {!searchText.trim() && (userRole === 'ADMIN' || userRole === 'SUPER_ADMIN') && (
+              <div style={{ marginBottom: 24 }}>
+                <Title level={5} style={{ marginBottom: 12 }}>
+                  Quick Links
+                </Title>
+                <Row gutter={[12, 12]}>
+                  <Col span={24}>
+                    <Card
+                      hoverable
+                      onClick={() => {
+                        navigate('/roles-access');
+                        setOpen(false);
+                      }}
+                      style={{
+                        borderRadius: 12,
+                        background: isDark
+                          ? 'rgba(30, 30, 30, 0.85)'
+                          : 'rgba(255, 255, 255, 0.9)',
+                        backdropFilter: 'blur(20px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(20px) saturate(180%)',
+                        border: isDark
+                          ? '1px solid rgba(255, 255, 255, 0.1)'
+                          : '1px solid rgba(255, 255, 255, 0.8)',
+                        boxShadow: isDark
+                          ? '0 8px 32px 0 rgba(0, 0, 0, 0.37), 0 0 0 1px rgba(255, 255, 255, 0.05)'
+                          : '0 8px 32px 0 rgba(31, 38, 135, 0.15), 0 0 0 1px rgba(255, 255, 255, 0.5)',
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
+                      }}
+                      bodyStyle={{ padding: 16 }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.transform = 'translateY(-2px)';
+                        e.currentTarget.style.boxShadow = isDark
+                          ? '0 12px 40px 0 rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)'
+                          : '0 12px 40px 0 rgba(31, 38, 135, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.6)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      <Space direction="vertical" size="small" style={{ width: '100%', textAlign: 'center' }}>
+                        <SafetyOutlined
+                          style={{
+                            fontSize: 32,
+                            color: '#722ed1',
+                          }}
+                        />
+                        <Text strong style={{ display: 'block', fontSize: 14 }}>
+                          Roles & Access
+                        </Text>
+                        <Text
+                          type="secondary"
+                          style={{ fontSize: 11, display: 'block' }}
+                        >
+                          Understand permissions
+                        </Text>
+                      </Space>
+                    </Card>
+                  </Col>
+                </Row>
+              </div>
+            )}
 
             {searchText.trim() ? (
               // Search results

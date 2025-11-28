@@ -47,27 +47,53 @@ export function AuthProvider({ children }) {
   }, [setUser, setSelectedTenant, selectedTenant]);
 
   // Fetch pages config immediately when user is authenticated
-  const { data: pagesData, isLoading: pagesLoading } = usePages({
+  const { data: pagesData, isLoading: pagesLoading, isError, error } = usePages({
     enabled: !!user, // Only fetch when user is logged in
   });
 
-  // Sync pages config to store
+  // Sync pages config to store and handle 401 errors
   useEffect(() => {
     // Always update loading state to ensure it's in sync
     setPagesLoading(pagesLoading);
     
-    if (pagesData) {
+    // Handle 401 errors - logout and redirect
+    if (isError && error) {
+      const errorStatus = error?.status || error?.response?.status;
+      const errorCode = error?.code || error?.response?.data?.error?.code;
+      
+      if (errorStatus === 401 || errorCode === 'UNAUTHORIZED' || errorCode === 'INVALIDTOKEN') {
+        // Clear token
+        localStorage.removeItem('token');
+        localStorage.removeItem('tenantId');
+        
+        // Logout
+        storeLogout(logoutApi, queryClient);
+        
+        // Ensure loading is false to prevent stuck loading screen
+        setPagesLoading(false);
+        
+        // Redirect to login (use setTimeout to avoid navigation during render)
+        if (window.location.pathname !== '/login') {
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 100);
+        }
+        return;
+      }
+    }
+    
+    if (pagesData && !isError) {
       const pagesConfig = pagesData?.data || (Array.isArray(pagesData) ? pagesData : []);
       setPagesConfig(pagesConfig);
       // Ensure loading is set to false when data is received
       if (pagesLoading === false) {
         setPagesLoading(false);
       }
-    } else if (pagesLoading === false && user) {
+    } else if (pagesLoading === false && user && !isError) {
       // If query is done but no data, ensure loading is false
       setPagesLoading(false);
     }
-  }, [pagesData, pagesLoading, setPagesConfig, setPagesLoading, user]);
+  }, [pagesData, pagesLoading, isError, error, setPagesConfig, setPagesLoading, user, storeLogout, queryClient]);
 
   // Wrapper functions that use the store
   const login = async (username, password) => {

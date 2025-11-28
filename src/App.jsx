@@ -12,6 +12,12 @@ function AppContent() {
   // Determine if we should show loading screen
   // Only show loading if pages are actually loading (not just initial state)
   const showLoading = loading || (isAuthenticated && pagesLoading === true && location.pathname !== '/login');
+  
+  // Safety check: if user is not authenticated and we're trying to show loading, redirect to login
+  // This handles the case where 401 error occurred and user was logged out
+  if (!isAuthenticated && showLoading && location.pathname !== '/login') {
+    return <Navigate to="/login" replace />;
+  }
 
   // Show loading while checking auth or loading pages
   if (showLoading) {

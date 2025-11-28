@@ -7,6 +7,7 @@ import OrganizationManagement from '../pages/OrganizationManagement';
 import AuditLogPage from '../pages/AuditLogPage';
 import ProfilePage from '../pages/ProfilePage';
 import DataPage from '../pages/DataPage';
+import RolesAccessPage from '../pages/RolesAccessPage';
 import ProtectedRoute from '../components/ProtectedRoute';
 import AdminRoute from '../components/AdminRoute';
 import DeveloperRoute from '../components/DeveloperRoute';
@@ -72,6 +73,13 @@ export const protectedRoutes = [
     element: <DataPage />,
     key: 'data-page',
     // No label - this is a dynamic route, not shown in menu
+  },
+  {
+    path: '/roles-access',
+    element: <RolesAccessPage />,
+    key: 'roles-access',
+    adminOnly: true, // Only ADMIN and SUPER_ADMIN can access
+    // No label - not shown in sidebar, accessible via Help Center
   },
 ];
 

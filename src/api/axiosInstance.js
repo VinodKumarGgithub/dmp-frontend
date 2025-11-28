@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { message } from 'antd';
 import useAuthStore from '../stores/authStore';
+import { logout as logoutApi } from './auth';
 
 const axiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api',
@@ -43,6 +44,42 @@ axiosInstance.interceptors.response.use(
     return response.data;
   },
   (error) => {
+    // Handle 401 Unauthorized - logout and clear token
+    if (error.response?.status === 401) {
+      // Clear token
+      localStorage.removeItem('token');
+      localStorage.removeItem('tenantId');
+      
+      // Logout from store
+      const store = useAuthStore.getState();
+      if (store.logout) {
+        store.logout(logoutApi, null); // Pass null for queryClient as we're in interceptor
+      }
+      
+      // Redirect to login (use window.location to avoid React Router dependency)
+      if (window.location.pathname !== '/login') {
+        // Use setTimeout to avoid navigation during render
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 0);
+      }
+      
+      // Return a consistent error format
+      const errorResponse = error.response?.data || {};
+      const errorCode = errorResponse.error?.code || errorResponse.code || 'UNAUTHORIZED';
+      const rawMessage = errorResponse.message || 
+                        errorResponse.error?.message || 
+                        'Your session has expired. Please sign in again.';
+      
+      return Promise.reject({
+        code: errorCode,
+        message: rawMessage,
+        formattedMessage: rawMessage,
+        details: errorResponse.error?.details || errorResponse.details,
+        status: 401,
+      });
+    }
+    
     // Handle error response
     const errorResponse = error.response?.data || {};
     const errorCode = errorResponse.error?.code || errorResponse.code || 'INTERNAL_ERROR';

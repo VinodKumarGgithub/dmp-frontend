@@ -10,6 +10,7 @@ import TenantSelector from '../components/TenantSelector';
 import ThemeToggle from '../components/ThemeToggle';
 import PageSwitcher from '../components/PageSwitcher';
 import HelpCenter from '../components/HelpCenter';
+import GlobalSearch from '../components/GlobalSearch';
 import { protectedRoutes } from '../config/routes';
 import { useOrganizationBranding } from '../hooks/useOrganizationBranding';
 import { getUserAvatarUrl } from '../utils/gravatar';
@@ -191,6 +192,8 @@ function AppLayout({ children }) {
         {Array.isArray(pagesConfig) && pagesConfig.length > 0 && <PageSwitcher />}
         {/* Help Center - always available */}
         <HelpCenter />
+        {/* Global Search - accessible via Cmd/Ctrl + K */}
+        <GlobalSearch />
       </div>
     </ProLayout>
   );
