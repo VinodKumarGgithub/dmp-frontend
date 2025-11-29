@@ -21,7 +21,7 @@ const { Text } = Typography;
 const features = [
   { title: 'Metadata-driven', description: 'It understands your database structure in real-time.', icon: <DatabaseOutlined /> },
   { title: 'Truly multi-tenant aware', description: 'One engine → Many clients → Zero duplication.', icon: <ApartmentOutlined /> },
-  { title: 'Secure dynamic querying', description: 'Only SELECT allowed + guardrails.', icon: <SafetyOutlined /> },
+  { title: 'Secure dynamic querying', description: 'Only SELECT allowed + guardrails. Zero data storage policy.', icon: <SafetyOutlined /> },
   { title: 'Fully customizable at user-level', description: 'Every user gets their own interface preferences.', icon: <UserOutlined /> },
   { title: 'Configurable, not coded', description: 'Everything is created from configuration — no developer needed.', icon: <SettingOutlined /> },
   { title: 'Logs, audit, activity tracking built-in', description: 'Enterprise-level safety, ready for compliance.', icon: <CheckCircleOutlined /> },

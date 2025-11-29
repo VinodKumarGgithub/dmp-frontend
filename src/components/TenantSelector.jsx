@@ -1,9 +1,10 @@
-import { Dropdown, Button, Spin, Typography, Space, theme as antdTheme } from 'antd';
+import { Dropdown, Button, Spin, Typography, Space, theme as antdTheme, Tooltip } from 'antd';
 import { DatabaseOutlined, CheckOutlined } from '@ant-design/icons';
 import { useTenants } from '../api/tenants';
 import useAuthStore from '../stores/authStore';
 import { useQueryClient } from '@tanstack/react-query';
-import { showSuccess } from '../utils/errorHandler';
+import { showSuccess, showError } from '../utils/errorHandler';
+import { useCanWrite } from '../hooks/useFeatureGate';
 
 const { Text } = Typography;
 
@@ -13,6 +14,7 @@ export default function TenantSelector() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated());
   const queryClient = useQueryClient();
   const { token } = antdTheme.useToken();
+  const { readOnly } = useCanWrite();
 
   // Fetch only ACTIVE tenants for selection - only when authenticated
   const { data: tenantsData, isLoading } = useTenants(
@@ -22,6 +24,12 @@ export default function TenantSelector() {
   const tenants = tenantsData?.data || (Array.isArray(tenantsData) ? tenantsData : []);
 
   const handleTenantChange = (tenantId) => {
+    // Block tenant switching if license expired (read-only mode)
+    if (readOnly && tenantId !== selectedTenant) {
+      showError('License expired. Tenant switching is disabled in read-only mode. Please renew your license.');
+      return;
+    }
+
     setSelectedTenant(tenantId);
     
     // Invalidate all tenant-dependent queries when tenant changes
@@ -113,17 +121,21 @@ export default function TenantSelector() {
   }
 
   return (
+    <Tooltip title={readOnly ? 'License expired. Tenant switching disabled in read-only mode.' : ''}>
     <Dropdown
       menu={{ items: menuItems }}
       placement="bottomRight"
       trigger={['click']}
+        disabled={readOnly}
     >
       <Button
         icon={<DatabaseOutlined />}
         style={{ color: token.colorText }}
+          disabled={readOnly}
       >
         {displayText}
       </Button>
     </Dropdown>
+    </Tooltip>
   );
 }

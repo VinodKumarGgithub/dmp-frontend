@@ -39,6 +39,7 @@ import {
 import { usePages } from '../api/pages';
 import { useCreatePageConfig, useUpdatePageConfig, useDeletePageConfig, useTables, useTableColumns, useTableIndexes, useProcedureParameters, testQuery, detectColumns } from '../api/pageConfig';
 import { useAuth } from '../contexts/AuthContext';
+import { useCanWrite } from '../hooks/useFeatureGate';
 import { Link } from 'react-router-dom';
 import axiosInstance from '../api/axiosInstance';
 import usePageConfigColumnsStore from '../stores/pageConfigColumnsStore';
@@ -76,6 +77,7 @@ export default function PageConfigManagement() {
   const createMutation = useCreatePageConfig();
   const updateMutation = useUpdatePageConfig();
   const deleteMutation = useDeletePageConfig();
+  const { canWrite, readOnly } = useCanWrite();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingPage, setEditingPage] = useState(null);
@@ -600,6 +602,8 @@ export default function PageConfigManagement() {
             type="link"
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
+            disabled={!canWrite || readOnly}
+            title={readOnly ? 'License expired. You are in read-only mode.' : ''}
           >
             Edit
           </Button>
@@ -609,11 +613,14 @@ export default function PageConfigManagement() {
             onConfirm={() => handleDelete(record.page_key)}
             okText="Yes"
             cancelText="No"
+            disabled={!canWrite || readOnly}
           >
             <Button
               type="link"
               danger
               icon={<DeleteOutlined />}
+              disabled={!canWrite || readOnly}
+              title={readOnly ? 'License expired. You are in read-only mode.' : ''}
             >
               Delete
             </Button>
@@ -1581,6 +1588,8 @@ export default function PageConfigManagement() {
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleAdd}
+            disabled={!canWrite || readOnly}
+            title={readOnly ? 'License expired. You are in read-only mode.' : !canWrite ? 'You do not have permission to create pages.' : ''}
           >
             Add New Page
           </Button>
@@ -1607,6 +1616,10 @@ export default function PageConfigManagement() {
         confirmLoading={createMutation.isPending || updateMutation.isPending}
         okText="Save"
         cancelText="Cancel"
+        okButtonProps={{
+          disabled: !canWrite || readOnly,
+          title: readOnly ? 'License expired. You are in read-only mode.' : ''
+        }}
       >
         <Form
           form={form}

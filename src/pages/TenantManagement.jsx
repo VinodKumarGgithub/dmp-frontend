@@ -35,6 +35,7 @@ import {
 import { useTenants, useCreateTenant, useUpdateTenant, useDeleteTenant, useTestTenantConnection } from '../api/tenants';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
+import { useCanWrite } from '../hooks/useFeatureGate';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -58,6 +59,7 @@ export default function TenantManagement() {
 
   const tenants = tenantsData?.data || (Array.isArray(tenantsData) ? tenantsData : []);
   const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+  const { canWrite, readOnly } = useCanWrite();
 
   const getStatusColor = (status) => {
     const colors = {
@@ -274,11 +276,12 @@ export default function TenantManagement() {
               loading={testConnectionMutation.isPending}
             />
           </Tooltip>
-          <Tooltip title="Edit">
+          <Tooltip title={readOnly ? 'License expired. Read-only mode.' : 'Edit'}>
             <Button
               type="text"
               icon={<EditOutlined />}
               onClick={() => handleEdit(record)}
+              disabled={!canWrite || readOnly}
             />
           </Tooltip>
           <Popconfirm
@@ -288,12 +291,14 @@ export default function TenantManagement() {
             okText="Yes"
             cancelText="No"
             okType="danger"
+            disabled={!canWrite || readOnly}
           >
-            <Tooltip title="Delete">
+            <Tooltip title={readOnly ? 'License expired. Read-only mode.' : 'Delete'}>
               <Button
                 type="text"
                 danger
                 icon={<DeleteOutlined />}
+                disabled={!canWrite || readOnly}
               />
             </Tooltip>
           </Popconfirm>
@@ -333,6 +338,8 @@ export default function TenantManagement() {
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleAdd}
+            disabled={!canWrite || readOnly}
+            title={readOnly ? 'License expired. You are in read-only mode.' : !canWrite ? 'You do not have permission to create tenants.' : ''}
           >
             Add New Tenant
           </Button>
@@ -361,6 +368,10 @@ export default function TenantManagement() {
         confirmLoading={createMutation.isPending || updateMutation.isPending}
         okText="Save"
         cancelText="Cancel"
+        okButtonProps={{
+          disabled: !canWrite || readOnly,
+          title: readOnly ? 'License expired. You are in read-only mode.' : ''
+        }}
       >
         <Form
           form={form}

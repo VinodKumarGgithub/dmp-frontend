@@ -11,6 +11,8 @@ import ThemeToggle from '../components/ThemeToggle';
 import PageSwitcher from '../components/PageSwitcher';
 import HelpCenter from '../components/HelpCenter';
 import GlobalSearch from '../components/GlobalSearch';
+import { LicenseStatusBanner } from '../components/LicenseStatusBanner';
+import { ReadOnlyModeIndicator } from '../components/ReadOnlyModeIndicator';
 import { protectedRoutes } from '../config/routes';
 import { useOrganizationBranding } from '../hooks/useOrganizationBranding';
 import { getUserAvatarUrl } from '../utils/gravatar';
@@ -166,6 +168,7 @@ function AppLayout({ children }) {
       }}
       actionsRender={() => {
         return [
+          <ReadOnlyModeIndicator key="readonly" />,
           <ThemeToggle key="theme" />,
           <TenantSelector key="tenant" />
         ];
@@ -187,6 +190,8 @@ function AppLayout({ children }) {
           borderRadius: token.borderRadius,
         }}
       >
+        {/* License Status Banner - shows warnings/errors for license issues */}
+        <LicenseStatusBanner />
         {children}
         {/* Floating page switcher - only show if there are pages configured */}
         {Array.isArray(pagesConfig) && pagesConfig.length > 0 && <PageSwitcher />}

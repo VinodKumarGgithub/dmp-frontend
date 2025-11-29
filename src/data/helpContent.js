@@ -593,6 +593,162 @@ export const getHelpContentByRole = (userRole) => {
         },
       ],
     },
+    'security': {
+      id: 'security',
+      title: 'Security & Privacy',
+      icon: SafetyOutlined,
+      color: '#52c41a',
+      roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'USER', 'DEVELOPER'],
+      items: [
+        {
+          id: 'sec-1',
+          title: 'Zero Data Storage Policy',
+          description: 'How we protect your data - we never store it.',
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'USER', 'DEVELOPER'],
+          content: `
+            <p><strong>Your data never leaves your database.</strong> We have a strict zero data storage policy.</p>
+            <h4>What This Means:</h4>
+            <ul>
+              <li><strong>No Data Storage:</strong> We do not store any of your query results or data</li>
+              <li><strong>Read-Only Access:</strong> We only read data temporarily to display it</li>
+              <li><strong>Immediate Return:</strong> Data is returned to you and then discarded</li>
+              <li><strong>No Persistence:</strong> Zero retention period - data is never saved</li>
+            </ul>
+            <h4>What We Do Store (Metadata Only):</h4>
+            <ul>
+              <li><strong>Encrypted SQL Queries:</strong> Query text is encrypted (AES-256) for audit purposes</li>
+              <li><strong>Execution Metrics:</strong> Performance data (execution time, row count)</li>
+              <li><strong>Audit Trail:</strong> Who accessed what, when, and from where</li>
+              <li><strong>No Actual Data:</strong> We never store row contents, column values, or any client data</li>
+            </ul>
+            <h4>Data Flow:</h4>
+            <ol>
+              <li>Query received from authenticated user</li>
+              <li>Executed against your database (read-only connection)</li>
+              <li>Results returned to you immediately</li>
+              <li>No data persisted in our system</li>
+              <li>Only audit metadata logged (encrypted)</li>
+            </ol>
+            <p><strong>Your data stays in your database. Always.</strong></p>
+          `,
+          videoUrl: null,
+          steps: [],
+        },
+        {
+          id: 'sec-2',
+          title: 'Encrypted Database Credentials',
+          description: 'How we protect your database connection credentials.',
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEVELOPER'],
+          content: `
+            <p>All database credentials are encrypted using industry-standard AES-256-GCM encryption.</p>
+            <h4>Security Measures:</h4>
+            <ul>
+              <li><strong>Encryption at Rest:</strong> Database passwords are encrypted before storage</li>
+              <li><strong>Encryption in Transit:</strong> All database connections use SSL/TLS</li>
+              <li><strong>Memory Protection:</strong> Credentials are cleared from memory after use</li>
+              <li><strong>No Plain Text:</strong> Passwords are never stored or transmitted in plain text</li>
+            </ul>
+            <h4>How It Works:</h4>
+            <ol>
+              <li>When you add a tenant, the password is encrypted immediately</li>
+              <li>Encrypted password is stored in our database</li>
+              <li>When connecting, password is decrypted temporarily in memory</li>
+              <li>After connection, password is cleared from memory</li>
+              <li>Password is never exposed in API responses or logs</li>
+            </ol>
+            <p><strong>Note:</strong> Only authorized administrators can manage tenant credentials.</p>
+          `,
+          videoUrl: null,
+          steps: [],
+        },
+        {
+          id: 'sec-3',
+          title: 'Read-Only Database Access',
+          description: 'We only read your data - never modify it.',
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'USER', 'DEVELOPER'],
+          content: `
+            <p>We use read-only database connections to ensure your data is never modified.</p>
+            <h4>What This Means:</h4>
+            <ul>
+              <li><strong>SELECT Only:</strong> We can only read data, never write, update, or delete</li>
+              <li><strong>No Modifications:</strong> Your data remains completely unchanged</li>
+              <li><strong>Safe Queries:</strong> All queries are validated to ensure they're read-only</li>
+              <li><strong>Permission Checks:</strong> We verify database user has only SELECT permissions</li>
+            </ul>
+            <h4>Security Validation:</h4>
+            <ul>
+              <li>SQL queries are scanned for dangerous operations (DROP, DELETE, UPDATE, etc.)</li>
+              <li>Only SELECT and WITH (CTE) statements are allowed</li>
+              <li>Database user permissions are validated on tenant creation</li>
+              <li>Any attempt to use write operations is blocked and logged</li>
+            </ul>
+            <h4>Best Practice:</h4>
+            <p>When setting up your database user, grant only SELECT permissions. This ensures maximum security even if credentials are compromised.</p>
+          `,
+          videoUrl: null,
+          steps: [],
+        },
+        {
+          id: 'sec-4',
+          title: 'Audit Trail & Compliance',
+          description: 'Complete audit logging without storing your data.',
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'USER', 'DEVELOPER'],
+          content: `
+            <p>We maintain a complete audit trail for security and compliance without storing your data.</p>
+            <h4>What's Logged:</h4>
+            <ul>
+              <li><strong>Query Execution:</strong> Encrypted SQL queries (for troubleshooting)</li>
+              <li><strong>Access Records:</strong> Who accessed what, when, and from where</li>
+              <li><strong>Performance Metrics:</strong> Execution time and row counts</li>
+              <li><strong>Error Logs:</strong> Failed queries and error messages</li>
+              <li><strong>User Activity:</strong> Login attempts, tenant switches, page access</li>
+            </ul>
+            <h4>What's NOT Logged:</h4>
+            <ul>
+              <li>Query result data</li>
+              <li>Row contents</li>
+              <li>Column values</li>
+              <li>Any actual client data</li>
+            </ul>
+            <h4>Privacy & Compliance:</h4>
+            <ul>
+              <li><strong>GDPR Compliant:</strong> No personal data stored</li>
+              <li><strong>Data Residency:</strong> Your data stays in your database</li>
+              <li><strong>Encrypted Logs:</strong> All sensitive information is encrypted</li>
+              <li><strong>Access Control:</strong> Only authorized users can view audit logs</li>
+            </ul>
+            <p><strong>You can export audit logs for compliance reporting.</strong></p>
+          `,
+          videoUrl: null,
+          steps: [],
+        },
+        {
+          id: 'sec-5',
+          title: 'SSL/TLS Database Connections',
+          description: 'All database connections are encrypted.',
+          roles: ['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'DEVELOPER'],
+          content: `
+            <p>All connections to your database are encrypted using SSL/TLS protocols.</p>
+            <h4>Connection Security:</h4>
+            <ul>
+              <li><strong>Encrypted Transport:</strong> All data in transit is encrypted</li>
+              <li><strong>Certificate Validation:</strong> Database certificates are verified</li>
+              <li><strong>Secure Protocols:</strong> Only secure connection methods are used</li>
+              <li><strong>No Plain Text:</strong> Credentials and data never travel unencrypted</li>
+            </ul>
+            <h4>Requirements:</h4>
+            <ul>
+              <li>Your database must support SSL/TLS connections</li>
+              <li>Valid SSL certificates are required (or self-signed with proper configuration)</li>
+              <li>Database firewall should allow connections from our servers</li>
+            </ul>
+            <p><strong>Note:</strong> Contact support if you need help configuring SSL for your database.</p>
+          `,
+          videoUrl: null,
+          steps: [],
+        },
+      ],
+    },
   };
 
   // Filter content by role

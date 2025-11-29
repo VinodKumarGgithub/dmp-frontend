@@ -44,6 +44,27 @@ axiosInstance.interceptors.response.use(
     return response.data;
   },
   (error) => {
+    // Handle 403 License Invalid - show error but don't logout
+    if (error.response?.status === 403) {
+      const errorCode = error.response?.data?.error?.code || error.response?.data?.code;
+      if (errorCode === 'LICENSE_INVALID' || errorCode === 'LICENSE_RESTRICTED' || errorCode === 'FEATURE_NOT_AVAILABLE') {
+        // License errors are handled by LicenseStatusBanner, just return the error
+        const errorResponse = error.response?.data || {};
+        const errorCode = errorResponse.error?.code || errorResponse.code || 'LICENSE_INVALID';
+        const rawMessage = errorResponse.message || 
+                          errorResponse.error?.message || 
+                          'Your license is invalid or has expired.';
+        
+        return Promise.reject({
+          code: errorCode,
+          message: rawMessage,
+          formattedMessage: rawMessage,
+          details: errorResponse.error?.details || errorResponse.details,
+          status: 403,
+        });
+      }
+    }
+
     // Handle 401 Unauthorized - logout and clear token
     if (error.response?.status === 401) {
       // Clear token

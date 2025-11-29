@@ -42,6 +42,7 @@ import useDataPageStore from '../stores/dataPageStore';
 import DataTable from '../components/DataTable';
 import ErrorDisplay from '../components/ErrorDisplay';
 import { useDebounce } from '../hooks/useDebounce';
+import { useCanWrite } from '../hooks/useFeatureGate';
 
 const { Title } = Typography;
 const { RangePicker } = DatePicker;
@@ -476,6 +477,12 @@ function DataPage() {
       return;
     }
 
+    // Check license status
+    if (readOnly || !canWrite) {
+      showError('License expired. Downloads are not available in read-only mode. Please renew your license.');
+      return;
+    }
+
     // Check if there's an error state
     if (isError) {
       showError('Cannot download data due to an error. Please resolve the error and try again.');
@@ -698,12 +705,16 @@ function DataPage() {
                     aria-label="Select export format"
                   />
                 </Tooltip>
-                <Tooltip title={`Download current data as ${exportFormat.toUpperCase()}. Only visible columns will be included.`}>
+                <Tooltip title={
+                  readOnly || !canWrite 
+                    ? 'License expired. Downloads are not available in read-only mode.' 
+                    : `Download current data as ${exportFormat.toUpperCase()}. Only visible columns will be included.`
+                }>
               <Button
                 type="primary"
                 icon={<DownloadOutlined />}
                 onClick={handleDownload}
-                disabled={isError || downloading}
+                disabled={isError || downloading || readOnly || !canWrite}
                 loading={downloading}
                     aria-label={downloading ? 'Downloading data' : `Download data as ${exportFormat.toUpperCase()}`}
               >

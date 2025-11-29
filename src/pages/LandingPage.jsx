@@ -6,6 +6,7 @@ import ProblemsSection from '../components/landing/ProblemsSection';
 import HowItWorksSection from '../components/landing/HowItWorksSection';
 import UniqueFeaturesSection from '../components/landing/UniqueFeaturesSection';
 import ValuePropositionSection from '../components/landing/ValuePropositionSection';
+import SecuritySection from '../components/landing/SecuritySection';
 import CTASection from '../components/landing/CTASection';
 import LandingBackground from '../components/landing/LandingBackground';
 import LandingNavbar from '../components/landing/LandingNavbar';
@@ -53,6 +54,7 @@ export default function LandingPage() {
         <HowItWorksSection />
         <UniqueFeaturesSection />
         <ValuePropositionSection />
+        <SecuritySection />
         <CTASection />
       </div>
     </div>
