@@ -24,6 +24,8 @@ import {
   Alert,
   Spin,
   Breadcrumb,
+  List,
+  Statistic,
 } from 'antd';
 import {
   PlusOutlined,
@@ -35,9 +37,11 @@ import {
   WarningOutlined,
   CheckCircleOutlined,
   HomeOutlined,
+  SearchOutlined,
+  PlayCircleOutlined,
 } from '@ant-design/icons';
 import { usePages } from '../api/pages';
-import { useCreatePageConfig, useUpdatePageConfig, useDeletePageConfig, useTables, useTableColumns, useTableIndexes, useProcedureParameters, testQuery, detectColumns } from '../api/pageConfig';
+import { useCreatePageConfig, useUpdatePageConfig, useDeletePageConfig, useTables, useTableColumns, useTableIndexes, useProcedureParameters, testQuery, detectColumns, detectColumnsEnhanced } from '../api/pageConfig';
 import { useAuth } from '../contexts/AuthContext';
 import { useCanWrite } from '../hooks/useFeatureGate';
 import { Link } from 'react-router-dom';
@@ -88,6 +92,7 @@ export default function PageConfigManagement() {
   const [detectingColumns, setDetectingColumns] = useState(false);
   const [testingQuery, setTestingQuery] = useState(false);
   const [queryTestResult, setQueryTestResult] = useState(null);
+  const [detectionResult, setDetectionResult] = useState(null);
   const [draggingColumnIndex, setDraggingColumnIndex] = useState(null);
   const [dragOverColumnIndex, setDragOverColumnIndex] = useState(null);
   const autoDetectRef = useRef('');
@@ -258,6 +263,58 @@ export default function PageConfigManagement() {
     }
   };
 
+  const handleDetectCustomQueryColumns = async () => {
+    const sourceType = form.getFieldValue('source_type');
+    if (sourceType !== 'CUSTOM_QUERY') {
+      message.warning('Enhanced column detection is only available for custom queries');
+      return;
+    }
+
+    const sourceParams = form.getFieldValue('source_params') || [];
+    const customQueryParam = sourceParams.find((param) => param?.name === 'custom_query');
+    const customQueryValue = customQueryParam?.value;
+
+    if (!customQueryValue || !customQueryValue.trim()) {
+      message.warning('Add a custom_query parameter with your SQL query before detecting columns');
+      return;
+    }
+
+    const pageKeyValue = form.getFieldValue('page_key') || editingPage?.page_key || 'detect';
+    setDetectingColumns(true);
+    setDetectionResult(null);
+
+    try {
+      const result = await detectColumnsEnhanced(pageKeyValue, customQueryValue);
+      
+      if (!result || !result.columns || result.columns.length === 0) {
+        message.warning('No columns were detected. Make sure your SQL returns at least one row.');
+        return;
+      }
+
+      // Format columns for form
+      const formattedColumns = result.columns.map((col) => ({
+        name: col.name,
+        label: formatLabelFromName(col.name),
+        type: col.type || 'string'
+      }));
+
+      // Auto-populate columns
+      form.setFieldsValue({
+        columns: formattedColumns
+      });
+      setAvailableColumns(deriveColumnOptions(formattedColumns));
+
+      // Store recommendations and performance feedback
+      setDetectionResult(result);
+
+      message.success(`Detected ${formattedColumns.length} column${formattedColumns.length === 1 ? '' : 's'} with recommendations`);
+    } catch (error) {
+      // Error already handled via handleApiError
+    } finally {
+      setDetectingColumns(false);
+    }
+  };
+
   const handleTestProcedureQuery = async () => {
     const sourceType = form.getFieldValue('source_type');
     if (sourceType !== 'PROCEDURE') {
@@ -279,11 +336,96 @@ export default function PageConfigManagement() {
     setQueryTestResult(null);
 
     try {
-      const result = await testQuery(pageKeyValue, pSqlValue, {});
+      const result = await testQuery(pageKeyValue, pSqlValue, undefined, {});
       setQueryTestResult(result);
 
       if (result?.valid) {
         message.success(`Query validated. Rows returned: ${result.rowCount ?? 0}`);
+      } else {
+        message.error(result?.error?.message || 'Query validation failed');
+      }
+    } catch (error) {
+      // handleApiError already displays a message
+    } finally {
+      setTestingQuery(false);
+    }
+  };
+
+  const handleTestQuery = async () => {
+    const sourceType = form.getFieldValue('source_type');
+    
+    if (sourceType !== 'PROCEDURE' && sourceType !== 'CUSTOM_QUERY') {
+      message.warning('Test query is only available for procedures and custom queries');
+      return;
+    }
+
+    const sourceParams = form.getFieldValue('source_params') || [];
+    
+    let sqlValue;
+    if (sourceType === 'CUSTOM_QUERY') {
+      const customQueryParam = sourceParams.find((param) => param?.name === 'custom_query');
+      sqlValue = customQueryParam?.value;
+    } else {
+      const pSqlParam = sourceParams.find((param) => param?.name === 'p_sql');
+      sqlValue = pSqlParam?.value;
+    }
+
+    if (!sqlValue || !sqlValue.trim()) {
+      message.warning(`Add a ${sourceType === 'CUSTOM_QUERY' ? 'custom_query' : 'p_sql'} parameter with your SQL query before testing`);
+      return;
+    }
+
+    // For CUSTOM_QUERY, no queryParams needed (filters come from UI)
+    const queryParams = {};
+
+    const pageKeyValue = form.getFieldValue('page_key') || editingPage?.page_key || 'test';
+    setTestingQuery(true);
+    setQueryTestResult(null);
+
+    try {
+      const result = await testQuery(
+        pageKeyValue, 
+        sourceType === 'CUSTOM_QUERY' ? undefined : sqlValue, // p_sql for PROCEDURE
+        sourceType === 'CUSTOM_QUERY' ? sqlValue : undefined, // custom_query for CUSTOM_QUERY
+        queryParams // Empty for CUSTOM_QUERY
+      );
+      setQueryTestResult(result);
+
+      if (result?.valid) {
+        message.success(`Query validated. Rows returned: ${result.rowCount ?? 0}`);
+        
+        // Auto-detect columns for CUSTOM_QUERY after successful test
+        if (sourceType === 'CUSTOM_QUERY') {
+          try {
+            setDetectingColumns(true);
+            const detectionResult = await detectColumnsEnhanced(pageKeyValue, sqlValue);
+            
+            if (detectionResult && detectionResult.columns && detectionResult.columns.length > 0) {
+              // Format columns for form
+              const formattedColumns = detectionResult.columns.map((col) => ({
+                name: col.name,
+                label: formatLabelFromName(col.name),
+                type: col.type || 'string'
+              }));
+
+              // Auto-populate columns
+              form.setFieldsValue({
+                columns: formattedColumns
+              });
+              setAvailableColumns(deriveColumnOptions(formattedColumns));
+
+              // Store recommendations and performance feedback
+              setDetectionResult(detectionResult);
+
+              message.success(`Auto-detected ${formattedColumns.length} column${formattedColumns.length === 1 ? '' : 's'} with recommendations`);
+            }
+          } catch (detectionError) {
+            // Silently fail - column detection is optional
+            console.warn('Column detection failed:', detectionError);
+          } finally {
+            setDetectingColumns(false);
+          }
+        }
       } else {
         message.error(result?.error?.message || 'Query validation failed');
       }
@@ -705,6 +847,7 @@ export default function PageConfigManagement() {
               <Option value="TABLE">Table</Option>
               <Option value="VIEW">View</Option>
               <Option value="PROCEDURE">Stored Procedure</Option>
+              <Option value="CUSTOM_QUERY">Custom Query (Raw SQL)</Option>
             </Select>
           </Form.Item>
           <Form.Item
@@ -718,7 +861,20 @@ export default function PageConfigManagement() {
               </Space>
             }
             rules={[
-              { required: true, message: 'Please select a data source' },
+              {
+                required: true,
+                message: 'Please select a data source',
+                validator: (_, value) => {
+                  const sourceType = form.getFieldValue('source_type');
+                  if (sourceType === 'CUSTOM_QUERY') {
+                    return Promise.resolve(); // Optional for CUSTOM_QUERY
+                  }
+                  if (!value) {
+                    return Promise.reject(new Error('Please select a data source'));
+                  }
+                  return Promise.resolve();
+                }
+              },
             ]}
           >
             <Form.Item
@@ -727,6 +883,12 @@ export default function PageConfigManagement() {
             >
               {({ getFieldValue }) => {
                 const sourceType = getFieldValue('source_type') || 'TABLE';
+                
+                // Hide data source selector for CUSTOM_QUERY
+                if (sourceType === 'CUSTOM_QUERY') {
+                  return null;
+                }
+                
                 // Filter tables based on source_type
                 const filteredDataSources = Array.isArray(tables) 
                   ? tables.filter(ds => {
@@ -782,6 +944,263 @@ export default function PageConfigManagement() {
           >
             {({ getFieldValue }) => {
               const sourceType = getFieldValue('source_type');
+              
+              // Handle CUSTOM_QUERY - show SQL editor
+              if (sourceType === 'CUSTOM_QUERY') {
+                return (
+                  <Form.List name="source_params">
+                    {(fields, { add, remove }) => {
+                      // Find custom_query field
+                      const customQueryField = fields.find((field) => {
+                        const paramName = form.getFieldValue(['source_params', field.name, 'name']);
+                        return paramName === 'custom_query';
+                      });
+                      
+                      // Get other parameters (excluding custom_query and system params)
+                      const queryParams = fields.filter((field) => {
+                        const paramName = form.getFieldValue(['source_params', field.name, 'name']);
+                        return paramName && 
+                               paramName !== 'custom_query' && 
+                               paramName !== 'page_size' && 
+                               paramName !== 'page_offset';
+                      });
+                      
+                      // Auto-add custom_query if it doesn't exist
+                      if (!customQueryField && fields.length === 0) {
+                        setTimeout(() => {
+                          add({ name: 'custom_query', type: 'string', value: '' }, 0);
+                        }, 0);
+                      }
+                      
+                      const customQueryValue = customQueryField 
+                        ? form.getFieldValue(['source_params', customQueryField.name, 'value'])
+                        : '';
+                      
+                      return (
+                        <>
+                          <Divider orientation="left" style={{ marginTop: token.marginMD }}>
+                            <Space>
+                              <span>Custom SQL Query</span>
+                              <Tooltip title="Enter your complete SQL query (SELECT only, read-only). Use :paramName for parameters. Parameters will be auto-detected and shown below.">
+                                <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                              </Tooltip>
+                            </Space>
+                          </Divider>
+                          <Alert
+                            message="Custom Query Mode"
+                            description="Write your SQL query with JOINs, CTEs, and aggregations. WHERE conditions, LIMIT, OFFSET, and parameters are not allowed - use the Filter/Search UI and pagination controls instead."
+                            type="info"
+                            showIcon
+                            style={{ marginBottom: token.marginMD }}
+                          />
+                          
+                          {/* SQL Editor - Only one */}
+                          {customQueryField && (
+                            <Card
+                              size="small"
+                              style={{ marginBottom: token.marginMD, background: token.colorFillAlter }}
+                            >
+                              <Form.Item
+                                name={[customQueryField.name, 'value']}
+                                label="SQL Query"
+                                rules={[
+                                  { required: true, message: 'SQL query is required' },
+                                  {
+                                    validator: async (_, value) => {
+                                      if (!value || !value.trim()) {
+                                        return Promise.reject(new Error('SQL query cannot be empty'));
+                                      }
+                                      
+                                      // Check for WHERE clause
+                                      if (/\bWHERE\b/i.test(value)) {
+                                        return Promise.reject(new Error('WHERE clauses are not allowed. Use the Filter/Search UI instead.'));
+                                      }
+                                      
+                                      // Check for LIMIT clause
+                                      if (/\bLIMIT\b/i.test(value)) {
+                                        return Promise.reject(new Error('LIMIT clauses are not allowed. Pagination is handled by the system using the page size from UI.'));
+                                      }
+                                      
+                                      // Check for OFFSET clause
+                                      if (/\bOFFSET\b/i.test(value)) {
+                                        return Promise.reject(new Error('OFFSET clauses are not allowed. Pagination is handled by the system using the page size from UI.'));
+                                      }
+                                      
+                                      // Check for SQL Server pagination syntax
+                                      if (/\bFETCH\s+NEXT\b/i.test(value) || /\bROWS\s+FETCH\s+NEXT\b/i.test(value)) {
+                                        return Promise.reject(new Error('FETCH NEXT clauses are not allowed. Pagination is handled by the system using the page size from UI.'));
+                                      }
+                                      
+                                      // Check for parameters (reject ALL parameters)
+                                      const paramMatches = value.matchAll(/:([a-zA-Z_][a-zA-Z0-9_]*)/g);
+                                      for (const match of paramMatches) {
+                                        const paramName = match[1];
+                                        return Promise.reject(new Error(`Parameters like :${paramName} are not allowed. Pagination and filtering are handled by the UI.`));
+                                      }
+                                      
+                                      return Promise.resolve();
+                                    }
+                                  }
+                                ]}
+                              >
+                                <Input.TextArea
+                                  rows={10}
+                                  placeholder="Enter your SQL query (SELECT only, no WHERE/LIMIT/OFFSET clauses)...&#10;Example:&#10;SELECT o.*, p.name as product_name&#10;FROM orders o&#10;INNER JOIN products p ON o.product_id = p.id&#10;ORDER BY o.order_date DESC&#10;&#10;Note: WHERE, LIMIT, OFFSET, and parameters are not allowed. Use Filter/Search UI and pagination controls instead."
+                                  style={{ fontFamily: 'monospace', fontSize: '13px' }}
+                                />
+                              </Form.Item>
+                              <Form.Item name={[customQueryField.name, 'name']} hidden initialValue="custom_query">
+                                <Input />
+                              </Form.Item>
+                              <Form.Item name={[customQueryField.name, 'type']} hidden initialValue="string">
+                                <Input />
+                              </Form.Item>
+                            </Card>
+                          )}
+                          
+                          {/* Test Query Button */}
+                          <Button
+                            type="primary"
+                            onClick={handleTestQuery}
+                            loading={testingQuery}
+                            icon={<PlayCircleOutlined />}
+                            style={{ marginBottom: token.marginMD, marginTop: token.marginMD }}
+                          >
+                            Test Query
+                          </Button>
+                          
+                          {/* Query Test Result */}
+                          {queryTestResult && (
+                            <Card title="Query Test Result" size="small" style={{ marginBottom: token.marginMD }}>
+                              {queryTestResult.valid ? (
+                                <Alert
+                                  message="Query Valid"
+                                  description={`Execution time: ${queryTestResult.executionTime}ms, Rows returned: ${queryTestResult.rowCount}`}
+                                  type="success"
+                                  showIcon
+                                />
+                              ) : (
+                                <Alert
+                                  message="Query Failed"
+                                  description={queryTestResult.error?.message || 'Unknown error'}
+                                  type="error"
+                                  showIcon
+                                />
+                              )}
+                              {queryTestResult.previewSql && (
+                                <div style={{ marginTop: token.marginMD }}>
+                                  <Text strong>Preview SQL:</Text>
+                                  <pre style={{ 
+                                    background: token.colorFillAlter, 
+                                    padding: token.paddingSM, 
+                                    borderRadius: token.borderRadius,
+                                    fontSize: '12px',
+                                    overflow: 'auto',
+                                    maxHeight: '200px'
+                                  }}>
+                                    {queryTestResult.previewSql}
+                                  </pre>
+                                </div>
+                              )}
+                            </Card>
+                          )}
+                          
+                          {/* Display recommendations and performance feedback */}
+                          {detectionResult && (
+                            <>
+                              <Divider orientation="left" style={{ marginTop: token.marginLG }}>
+                                Column Recommendations
+                              </Divider>
+                              <Row gutter={16} style={{ marginBottom: token.marginMD }}>
+                                <Col span={12}>
+                                  <Card title="Recommended Filterable Columns" size="small">
+                                    <List
+                                      size="small"
+                                      dataSource={detectionResult.recommendations?.filterable || []}
+                                      renderItem={(item) => (
+                                        <List.Item>
+                                          <Space>
+                                            <Tag color={item.hasIndex ? 'green' : 'blue'}>
+                                              {item.name}
+                                            </Tag>
+                                            {item.hasIndex && <Tag color="gold">Indexed</Tag>}
+                                            <Text type="secondary" style={{ fontSize: '12px' }}>
+                                              {item.recommendation}
+                                            </Text>
+                                          </Space>
+                                        </List.Item>
+                                      )}
+                                      locale={{ emptyText: 'No filterable columns recommended' }}
+                                    />
+                                  </Card>
+                                </Col>
+                                <Col span={12}>
+                                  <Card title="Recommended Searchable Columns" size="small">
+                                    <List
+                                      size="small"
+                                      dataSource={detectionResult.recommendations?.searchable || []}
+                                      renderItem={(item) => (
+                                        <List.Item>
+                                          <Space>
+                                            <Tag color={item.hasIndex ? 'green' : 'blue'}>
+                                              {item.name}
+                                            </Tag>
+                                            {item.hasIndex && <Tag color="gold">Indexed</Tag>}
+                                            <Text type="secondary" style={{ fontSize: '12px' }}>
+                                              {item.recommendation}
+                                            </Text>
+                                          </Space>
+                                        </List.Item>
+                                      )}
+                                      locale={{ emptyText: 'No searchable columns recommended' }}
+                                    />
+                                  </Card>
+                                </Col>
+                              </Row>
+                              
+                              {/* Performance Feedback */}
+                              {detectionResult.performance && (
+                                <Card title="Performance Feedback" size="small" style={{ marginBottom: token.marginMD }}>
+                                  {detectionResult.performance.warnings?.map((warning, idx) => (
+                                    <Alert
+                                      key={idx}
+                                      message={warning.message}
+                                      description={warning.details}
+                                      type="warning"
+                                      showIcon
+                                      style={{ marginBottom: token.marginXS }}
+                                    />
+                                  ))}
+                                  {detectionResult.performance.suggestions?.map((suggestion, idx) => (
+                                    <Alert
+                                      key={idx}
+                                      message={suggestion.message}
+                                      description={suggestion.details}
+                                      type="info"
+                                      showIcon
+                                      style={{ marginBottom: token.marginXS }}
+                                    />
+                                  ))}
+                                  {detectionResult.performance.summary && (
+                                    <Space style={{ marginTop: token.marginSM }}>
+                                      <Text strong>Summary:</Text>
+                                      <Text>
+                                        {detectionResult.performance.summary.indexedColumns}/
+                                        {detectionResult.performance.summary.totalColumns} columns indexed
+                                      </Text>
+                                    </Space>
+                                  )}
+                                </Card>
+                              )}
+                            </>
+                          )}
+                        </>
+                      );
+                    }}
+                  </Form.List>
+                );
+              }
+              
               if (sourceType === 'PROCEDURE' || sourceType === 'VIEW') {
                 return (
                   <Form.List name="source_params">
