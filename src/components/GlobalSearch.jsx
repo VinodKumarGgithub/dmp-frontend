@@ -218,7 +218,7 @@ export default function GlobalSearch() {
           WebkitBackdropFilter: 'blur(8px)',
         },
       }}
-      destroyOnClose
+      destroyOnHidden
       closable={false}
     >
       <div style={{ padding: token.paddingLG }}>

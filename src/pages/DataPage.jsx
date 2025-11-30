@@ -44,7 +44,7 @@ import ErrorDisplay from '../components/ErrorDisplay';
 import { useDebounce } from '../hooks/useDebounce';
 import { useCanWrite } from '../hooks/useFeatureGate';
 
-const { Title } = Typography;
+const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 
 const toTitle = (text = '') => {
@@ -196,6 +196,9 @@ function DataPage() {
 
     return params;
   }, [debouncedSearchText, mergedFilters, pageState?.pagination, sorting]);
+
+  // Check license status for write operations
+  const { canWrite, readOnly } = useCanWrite();
 
   // Fetch page config and data
   // Use isFetching for table loading (shows loading on refetch)
@@ -518,12 +521,16 @@ function DataPage() {
       <div
         style={{
           display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
           minHeight: '60vh',
         }}
       >
-        <Spin size="large" tip="Loading page configuration..." />
+        <Spin size="large" />
+        <div style={{ marginTop: token.marginMD }}>
+          <Text type="secondary">Loading page configuration...</Text>
+        </div>
       </div>
     );
   }
@@ -907,7 +914,7 @@ function DataPage() {
         }
         open={columnModalOpen}
         onCancel={handleColumnModalClose}
-        destroyOnClose={false}
+        destroyOnHidden={false}
         footer={[
           <Button key="revert" onClick={handleRevertToSaved} disabled={!columnSettings.length}>
             Revert to saved

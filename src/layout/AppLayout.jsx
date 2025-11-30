@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react';
 import { ProLayout } from '@ant-design/pro-layout';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { UserOutlined, LogoutOutlined, HomeOutlined, SettingOutlined, MailOutlined, PhoneOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, HomeOutlined, SettingOutlined, MailOutlined, PhoneOutlined, BarChartOutlined } from '@ant-design/icons';
 import { Dropdown, Space, Button, theme, Typography } from 'antd';
 import useAuthStore from '../stores/authStore';
 import { useQueryClient } from '@tanstack/react-query';
@@ -45,6 +45,10 @@ function AppLayout({ children }) {
     ...protectedRoutes
       .filter((route) => route.label && route.key !== 'home')
       .filter((route) => {
+        // Only show super admin routes to SUPER_ADMIN users
+        if (route.superAdminOnly && user?.role !== 'SUPER_ADMIN') {
+          return false;
+        }
         // Only show admin routes to admin or super admin users
         if (route.adminOnly && user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
           return false;
@@ -63,6 +67,8 @@ function AppLayout({ children }) {
             <SettingOutlined />
           ) : route.key === 'users' ? (
             <UserOutlined />
+          ) : route.key === 'analytics' ? (
+            <BarChartOutlined />
           ) : (
             <HomeOutlined />
           ),

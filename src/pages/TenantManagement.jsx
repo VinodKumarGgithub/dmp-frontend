@@ -36,6 +36,7 @@ import { useTenants, useCreateTenant, useUpdateTenant, useDeleteTenant, useTestT
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { useCanWrite } from '../hooks/useFeatureGate';
+import { useLicenseLimits } from '../hooks/useLicenseLimits';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -60,6 +61,11 @@ export default function TenantManagement() {
   const tenants = tenantsData?.data || (Array.isArray(tenantsData) ? tenantsData : []);
   const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
   const { canWrite, readOnly } = useCanWrite();
+
+  // Get license limit info for tenants
+  const currentTenantCount = tenants.filter(t => t.organization_id === currentUser?.organization_id || isSuperAdmin).length;
+  const { data: tenantLimitInfo, isLoading: limitLoading } = useLicenseLimits('tenants', currentTenantCount);
+  const tenantLimitReached = !isSuperAdmin && tenantLimitInfo && tenantLimitInfo.limit !== null && !tenantLimitInfo.allowed;
 
   const getStatusColor = (status) => {
     const colors = {
@@ -334,16 +340,45 @@ export default function TenantManagement() {
           <Title level={2} style={{ margin: 0 }}>
             <DatabaseOutlined /> Tenant Management
           </Title>
+          <Space>
+            {!isSuperAdmin && tenantLimitInfo && tenantLimitInfo.limit !== null && (
+              <Text type={tenantLimitReached ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
+                Tenants: {tenantLimitInfo.current}/{tenantLimitInfo.limit}
+                {tenantLimitInfo.remaining !== null && tenantLimitInfo.remaining > 0 && (
+                  <span style={{ color: token.colorSuccess }}> ({tenantLimitInfo.remaining} remaining)</span>
+                )}
+              </Text>
+            )}
           <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={handleAdd}
-            disabled={!canWrite || readOnly}
-            title={readOnly ? 'License expired. You are in read-only mode.' : !canWrite ? 'You do not have permission to create tenants.' : ''}
+              disabled={!canWrite || readOnly || tenantLimitReached}
+              title={
+                tenantLimitReached 
+                  ? `Tenant limit reached: ${tenantLimitInfo.current}/${tenantLimitInfo.limit}. Please upgrade your license.`
+                  : readOnly 
+                    ? 'License expired. You are in read-only mode.' 
+                    : !canWrite 
+                      ? 'You do not have permission to create tenants.' 
+                      : ''
+              }
           >
             Add New Tenant
           </Button>
+          </Space>
         </div>
+
+        {tenantLimitReached && (
+          <Alert
+            message="Tenant Limit Reached"
+            description={`You have reached the maximum number of tenants allowed by your license (${tenantLimitInfo.current}/${tenantLimitInfo.limit}). Please upgrade your license to add more tenants.`}
+            type="warning"
+            showIcon
+            style={{ marginBottom: token.marginLG }}
+            closable
+          />
+        )}
 
         <Table
           columns={columns}

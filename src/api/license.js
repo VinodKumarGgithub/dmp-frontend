@@ -1,4 +1,6 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axiosInstance from './axiosInstance';
+import { handleApiError, showSuccess } from '../utils/errorHandler';
 
 /**
  * Get license status for current organization
@@ -89,5 +91,111 @@ export async function renewLicense(organizationId, additionalDays) {
 export async function getLicenseFeatures() {
   const response = await axiosInstance.get('/license/features');
   return response.data;
+}
+
+/**
+ * Fetch all licenses (SUPER_ADMIN only)
+ */
+export function useLicenses(filters = {}, options = {}) {
+  const { enabled = true } = options;
+
+  return useQuery({
+    queryKey: ['licenses', filters],
+    queryFn: async () => {
+      const params = {};
+      if (filters.search) params.search = filters.search;
+      if (filters.status) params.status = filters.status;
+
+      const res = await axiosInstance.get('/license', { params });
+      return res.data || res;
+    },
+    enabled,
+  });
+}
+
+/**
+ * Fetch license by organization ID
+ */
+export function useLicenseByOrganization(organizationId, options = {}) {
+  const { enabled = true } = options;
+
+  return useQuery({
+    queryKey: ['licenses', organizationId],
+    queryFn: async () => {
+      const res = await axiosInstance.get(`/license/organization/${organizationId}`);
+      return res.data || res;
+    },
+    enabled: enabled && !!organizationId,
+  });
+}
+
+/**
+ * Create license mutation (SUPER_ADMIN only)
+ */
+export function useCreateLicense() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data) => {
+      try {
+        const res = await axiosInstance.post('/license', data);
+        showSuccess('License created successfully!');
+        queryClient.invalidateQueries({ queryKey: ['licenses'] });
+        queryClient.invalidateQueries({ queryKey: ['license', 'status'] });
+        return res.data || res;
+      } catch (error) {
+        handleApiError(error);
+        throw error;
+      }
+    },
+  });
+}
+
+/**
+ * Update license mutation (SUPER_ADMIN only)
+ */
+export function useUpdateLicense() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ organizationId, updates }) => {
+      try {
+        const res = await axiosInstance.put(`/license/organization/${organizationId}`, updates);
+        showSuccess('License updated successfully!');
+        queryClient.invalidateQueries({ queryKey: ['licenses'] });
+        queryClient.invalidateQueries({ queryKey: ['licenses', organizationId] });
+        queryClient.invalidateQueries({ queryKey: ['license', 'status'] });
+        return res.data || res;
+      } catch (error) {
+        handleApiError(error);
+        throw error;
+      }
+    },
+  });
+}
+
+/**
+ * Renew license mutation
+ */
+export function useRenewLicense() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ organizationId, additionalDays }) => {
+      try {
+        const res = await axiosInstance.post(`/license/organization/${organizationId}/renew`, {
+          additionalDays
+        });
+        showSuccess(`License renewed successfully for ${additionalDays} days!`);
+        queryClient.invalidateQueries({ queryKey: ['licenses'] });
+        queryClient.invalidateQueries({ queryKey: ['licenses', organizationId] });
+        queryClient.invalidateQueries({ queryKey: ['license', 'status'] });
+        return res.data || res;
+      } catch (error) {
+        handleApiError(error);
+        throw error;
+      }
+    },
+  });
 }
 

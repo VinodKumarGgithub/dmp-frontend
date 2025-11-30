@@ -41,6 +41,8 @@ import { usePages } from '../api/pages';
 import { useAuth } from '../contexts/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../contexts/ThemeContext';
+import { useLicenseLimits } from '../hooks/useLicenseLimits';
+import { useLicenseStatus } from '../hooks/useLicenseStatus';
 
 const { Title, Text } = Typography;
 
@@ -83,6 +85,12 @@ export default function UserManagement() {
 
   const effectiveRole = roleWatch || editingUser?.role || 'USER';
   const isTenantRequired = effectiveRole !== 'ADMIN' && effectiveRole !== 'SUPER_ADMIN' && effectiveRole !== 'MANAGER';
+
+  // Get license limit info for users
+  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
+  const currentUserCount = users.filter(u => u.organization_id === currentUser?.organization_id || isSuperAdmin).length;
+  const { data: userLimitInfo, isLoading: limitLoading } = useLicenseLimits('users', currentUserCount);
+  const userLimitReached = !isSuperAdmin && userLimitInfo && userLimitInfo.limit !== null && !userLimitInfo.allowed;
 
   const handleAdd = () => {
     setEditingUser(null);
@@ -245,8 +253,6 @@ export default function UserManagement() {
     setIsDrawerOpen(false);
     setSelectedUser(null);
   };
-
-  const isSuperAdmin = currentUser?.role === 'SUPER_ADMIN';
 
   const columns = [
     // Only show User ID for SUPER_ADMIN
@@ -448,10 +454,37 @@ export default function UserManagement() {
           <Title level={2} style={{ margin: 0 }}>
             <UserOutlined /> User Management
           </Title>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd}>
+          <Space>
+            {!isSuperAdmin && userLimitInfo && userLimitInfo.limit !== null && (
+              <Text type={userLimitReached ? 'danger' : 'secondary'} style={{ fontSize: 12 }}>
+                Users: {userLimitInfo.current}/{userLimitInfo.limit}
+                {userLimitInfo.remaining !== null && userLimitInfo.remaining > 0 && (
+                  <span style={{ color: token.colorSuccess }}> ({userLimitInfo.remaining} remaining)</span>
+                )}
+              </Text>
+            )}
+            <Button 
+              type="primary" 
+              icon={<PlusOutlined />} 
+              onClick={handleAdd}
+              disabled={userLimitReached}
+              title={userLimitReached ? `User limit reached: ${userLimitInfo.current}/${userLimitInfo.limit}. Please upgrade your license.` : ''}
+            >
             Add New User
           </Button>
+          </Space>
         </div>
+
+        {userLimitReached && (
+          <Alert
+            message="User Limit Reached"
+            description={`You have reached the maximum number of users allowed by your license (${userLimitInfo.current}/${userLimitInfo.limit}). Please upgrade your license to add more users.`}
+            type="warning"
+            showIcon
+            style={{ marginBottom: token.marginLG }}
+            closable
+          />
+        )}
 
         {/* Role Reference Card */}
         <Alert

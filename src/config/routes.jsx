@@ -5,7 +5,9 @@ import PageConfigManagement from '../pages/PageConfigManagement';
 import UserManagement from '../pages/UserManagement';
 import TenantManagement from '../pages/TenantManagement';
 import OrganizationManagement from '../pages/OrganizationManagement';
+import LicenseManagement from '../pages/LicenseManagement';
 import AuditLogPage from '../pages/AuditLogPage';
+import UsageAnalytics from '../pages/UsageAnalytics';
 import ProfilePage from '../pages/ProfilePage';
 import DataPage from '../pages/DataPage';
 import RolesAccessPage from '../pages/RolesAccessPage';
@@ -62,11 +64,25 @@ export const protectedRoutes = [
     adminOnly: true,
   },
   {
+    path: '/licenses',
+    element: <LicenseManagement />,
+    label: 'License Management',
+    key: 'licenses',
+    superAdminOnly: true, // Only SUPER_ADMIN can access
+  },
+  {
     path: '/audit-logs',
     element: <AuditLogPage />,
     label: 'Audit Logs',
     key: 'audit-logs',
     adminOnly: true,
+  },
+  {
+    path: '/analytics',
+    element: <UsageAnalytics />,
+    label: 'Usage Analytics',
+    key: 'analytics',
+    adminOnly: true, // ADMIN and SUPER_ADMIN can access
   },
   {
     path: '/profile',

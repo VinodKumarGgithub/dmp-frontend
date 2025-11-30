@@ -21,12 +21,16 @@ export default function HomePage() {
       <div
         style={{
           display: 'flex',
+          flexDirection: 'column',
           justifyContent: 'center',
           alignItems: 'center',
           minHeight: '60vh',
         }}
       >
-        <Spin size="large" tip="Loading pages configuration..." />
+        <Spin size="large" />
+        <div style={{ marginTop: token.marginMD }}>
+          <Text type="secondary">Loading pages configuration...</Text>
+        </div>
       </div>
     );
   }
