@@ -780,19 +780,19 @@ export default function PageConfigManagement() {
       children: (
         <>
           {editingPage && (
-            <Form.Item
-              name="page_key"
-              label={
-                <Space>
-                  <span>Page Key</span>
+          <Form.Item
+            name="page_key"
+            label={
+              <Space>
+                <span>Page Key</span>
                   <Tooltip title="Unique identifier for this page (cannot be changed)">
-                    <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
-                  </Tooltip>
-                </Space>
-              }
-            >
+                  <InfoCircleOutlined style={{ color: token.colorTextSecondary }} />
+                </Tooltip>
+              </Space>
+            }
+          >
               <Input placeholder="e.g., age_edit" disabled={true} />
-            </Form.Item>
+          </Form.Item>
           )}
 
           <Form.Item
@@ -1801,7 +1801,7 @@ export default function PageConfigManagement() {
                             <Input placeholder="e.g., Status" />
                           </Form.Item>
                         </Col>
-                        <Col span={8}>
+                        <Col span={6}>
                           <Form.Item
                             {...restField}
                             name={[name, 'type']}
@@ -1811,10 +1811,44 @@ export default function PageConfigManagement() {
                           >
                             <Select>
                               <Option value="text">Text Input</Option>
+                              <Option value="textarea">Textarea (Long Text)</Option>
                               <Option value="tags">Multi-Search (Tags)</Option>
-                              <Option value="select">Dropdown</Option>
+                              <Option value="select">Dropdown (Select)</Option>
+                              <Option value="radio">Radio Buttons</Option>
                               <Option value="number">Number</Option>
                               <Option value="date">Date Range</Option>
+                              <Option value="time">Time</Option>
+                              <Option value="datetime">Date & Time</Option>
+                              <Option value="email">Email</Option>
+                              <Option value="url">URL</Option>
+                              <Option value="boolean">Boolean (Checkbox)</Option>
+                            </Select>
+                          </Form.Item>
+                        </Col>
+                        <Col span={6}>
+                          <Form.Item
+                            {...restField}
+                            name={[name, 'operator']}
+                            label="Operator"
+                            tooltip="Select the comparison operator. Leave empty for auto (based on type)"
+                          >
+                            <Select placeholder="Auto (Default)" allowClear>
+                              <Option value="">Auto (Default)</Option>
+                              <Option value="=">= (Equals)</Option>
+                              <Option value="!=">!= (Not Equals)</Option>
+                              <Option value=">">&gt; (Greater Than)</Option>
+                              <Option value="<">&lt; (Less Than)</Option>
+                              <Option value=">=">&gt;= (Greater or Equal)</Option>
+                              <Option value="<=">&lt;= (Less or Equal)</Option>
+                              <Option value="LIKE">LIKE (Contains)</Option>
+                              <Option value="NOT LIKE">NOT LIKE (Not Contains)</Option>
+                              <Option value="STARTS WITH">Starts With</Option>
+                              <Option value="ENDS WITH">Ends With</Option>
+                              <Option value="IN">IN (One of)</Option>
+                              <Option value="NOT IN">NOT IN (Not one of)</Option>
+                              <Option value="IS NULL">IS NULL</Option>
+                              <Option value="IS NOT NULL">IS NOT NULL</Option>
+                              <Option value="BETWEEN">BETWEEN (Range)</Option>
                             </Select>
                           </Form.Item>
                         </Col>
@@ -1830,13 +1864,13 @@ export default function PageConfigManagement() {
                       >
                         {({ getFieldValue }) => {
                           const filterType = getFieldValue(['filterable_fields', name, 'type']);
-                          if (filterType === 'select') {
+                          if (filterType === 'select' || filterType === 'radio') {
                             return (
                               <Form.Item
                                 {...restField}
                                 name={[name, 'options']}
-                                label="Dropdown Options"
-                                rules={[{ required: true, message: 'Required for dropdown' }]}
+                                label={filterType === 'radio' ? 'Radio Options' : 'Dropdown Options'}
+                                rules={[{ required: true, message: `Required for ${filterType === 'radio' ? 'radio buttons' : 'dropdown'}` }]}
                               >
                                 <Select
                                   mode="tags"

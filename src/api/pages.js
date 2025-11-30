@@ -72,7 +72,7 @@ export function usePage(pageKey, queryParams = {}) {
       return res.data || res;
     },
     enabled: !!pageKey,
-    // Keep previous data while fetching new data (prevents UI flicker)
+    // Keep previous data while fetching new data (prevents UI flicker and keeps data on error)
     placeholderData: (previousData) => previousData,
     // Don't refetch on window focus to prevent unwanted reloads
     refetchOnWindowFocus: false,

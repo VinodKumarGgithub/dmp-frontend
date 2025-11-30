@@ -2,12 +2,14 @@ import { useMemo, useEffect, useCallback, useState } from 'react';
 import {
   Card,
   Input,
+  InputNumber,
   Button,
   Space,
   Typography,
   Form,
   Select,
   DatePicker,
+  TimePicker,
   Spin,
   Tag,
   Alert,
@@ -101,6 +103,9 @@ function DataPage() {
   const [exportFormat, setExportFormat] = useState('csv');
   const [draggingColumn, setDraggingColumn] = useState(null);
   const [dragOverColumn, setDragOverColumn] = useState(null);
+  
+  // Store last successful data to preserve it on error
+  const [lastSuccessfulData, setLastSuccessfulData] = useState(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -161,6 +166,7 @@ function DataPage() {
   // Reset immediate filters when page changes
   useEffect(() => {
     setImmediateFilters({});
+    setLastSuccessfulData(null); // Reset last successful data when page changes
   }, [pageKey]);
 
   // Cleanup on unmount
@@ -207,15 +213,29 @@ function DataPage() {
   const { data: pagePreferences } = usePagePreferences(pageKey, { enabled: Boolean(pageKey) });
   const savePreferencesMutation = useSavePagePreferences(pageKey);
 
+  // Update last successful data when we get successful data
+  useEffect(() => {
+    if (pageData && !isError && pageData.data) {
+      setLastSuccessfulData(pageData);
+    }
+  }, [pageData, isError]);
+
   // Handle response format from axios interceptor:
   // Backend returns: { success: true, message: "...", data: { config, data, total } }
   // Axios interceptor returns: { success: true, message: "...", data: { config, data, total } }
   // usePage returns: res.data || res, which would be { config, data, total }
   // So pageData should be { config, data, total }
-  const config = pageData?.config;
-  const tableData = Array.isArray(pageData?.data) ? pageData.data : [];
-  const backendTotal = pageData?.total ?? 0;
-  const hasMore = config?.source_type === 'PROCEDURE' ? Boolean(pageData?.hasMore) : false;
+  // Use lastSuccessfulData when there's an error to preserve the table
+  const config = pageData?.config || lastSuccessfulData?.config;
+  const tableData = isError && lastSuccessfulData 
+    ? (Array.isArray(lastSuccessfulData.data) ? lastSuccessfulData.data : [])
+    : (Array.isArray(pageData?.data) ? pageData.data : []);
+  const backendTotal = isError && lastSuccessfulData
+    ? (lastSuccessfulData.total ?? 0)
+    : (pageData?.total ?? 0);
+  const hasMore = config?.source_type === 'PROCEDURE' 
+    ? Boolean(isError && lastSuccessfulData ? lastSuccessfulData.hasMore : pageData?.hasMore) 
+    : false;
 
   const baseColumns = useMemo(() => {
     if (!Array.isArray(config?.columns)) return [];
@@ -510,6 +530,13 @@ function DataPage() {
     setImmediateFilters({});
   };
 
+  const handleRetryWithReset = () => {
+    // Reset filters and search when retrying after error
+    handleReset();
+    // Then refetch
+    refetch();
+  };
+
   const handleMoreClick = (record) => {
     setSelectedRecord(pageKey, record);
     setDrawerVisible(pageKey, true);
@@ -535,7 +562,9 @@ function DataPage() {
     );
   }
 
-  if (isError) {
+  // Only show full error page if we don't have config yet (initial load error)
+  // Otherwise, show error inline while keeping UI functional
+  if (isError && !config) {
     return (
       <div style={{ padding: token.paddingLG }}>
         <Breadcrumb
@@ -559,9 +588,9 @@ function DataPage() {
           ]}
         />
         <ErrorDisplay error={error} config={config} />
-          <Button icon={<ReloadOutlined />} onClick={() => refetch()} style={{ marginTop: token.marginMD }}>
-            Retry
-          </Button>
+        <Button icon={<ReloadOutlined />} onClick={handleRetryWithReset} style={{ marginTop: token.marginMD }}>
+          Retry
+        </Button>
       </div>
     );
   }
@@ -732,7 +761,14 @@ function DataPage() {
             )}
             <Button 
               icon={<ReloadOutlined />} 
-              onClick={() => refetch()}
+              onClick={() => {
+                // If there's an error, reset filters before refreshing
+                if (isError) {
+                  handleRetryWithReset();
+                } else {
+                  refetch();
+                }
+              }}
               aria-label="Refresh page data"
             >
               Refresh
@@ -796,82 +832,263 @@ function DataPage() {
           >
             <Form form={form} layout="inline">
               <Row gutter={[16, 16]} align="bottom" style={{ width: '100%' }}>
-                {config.filterable_fields.map((field) => (
-                  <Col key={field.name} xs={24} sm={12} md={8} lg={6}>
-                    <Form.Item 
-                      label={field.label} 
-                      style={{ marginBottom: 0 }}
-                      htmlFor={`filter-${field.name}`}
-                    >
-                      {field.type === 'select' ? (
-                        <Select
-                          id={`filter-${field.name}`}
-                          placeholder={`Select ${field.label}`}
-                          allowClear
-                          style={{ width: '100%' }}
-                          onChange={(value) => handleFilterChange(field.name, value, true)}
-                          options={
-                            field.options
-                              ? field.options.map((opt) => ({ label: opt, value: opt }))
-                              : []
-                          }
-                          aria-label={`Filter by ${field.label}`}
-                        />
-                      ) : field.type === 'date' ? (
-                        <RangePicker
-                          id={`filter-${field.name}`}
-                          style={{ width: '100%' }}
-                          onChange={(dates) => {
-                            if (dates && dates[0] && dates[1]) {
-                              handleFilterChange(`${field.name}_from`, dates[0].format('YYYY-MM-DD'), true);
-                              handleFilterChange(`${field.name}_to`, dates[1].format('YYYY-MM-DD'), true);
-                            } else {
-                              handleFilterChange(`${field.name}_from`, null, true);
-                              handleFilterChange(`${field.name}_to`, null, true);
+                {config.filterable_fields.map((field) => {
+                  const operator = field.operator || '';
+                  const isNullOperator = operator === 'IS NULL' || operator === 'IS NOT NULL' || operator === 'IS_NULL' || operator === 'IS_NOT_NULL';
+                  const isBetweenOperator = operator === 'BETWEEN' || operator === 'between';
+                  const isInOperator = operator === 'IN' || operator === 'NOT IN' || operator === 'NOT_IN' || operator === 'in' || operator === 'not_in';
+                  
+                  // For IS NULL / IS NOT NULL, show a toggle button instead of input
+                  if (isNullOperator) {
+                    return (
+                      <Col key={field.name} xs={24} sm={12} md={8} lg={6}>
+                        <Form.Item 
+                          label={field.label} 
+                          style={{ marginBottom: 0 }}
+                        >
+                          <Button
+                            type={filters[field.name] === 'true' ? 'primary' : 'default'}
+                            onClick={() => {
+                              handleFilterChange(field.name, filters[field.name] === 'true' ? null : 'true', true);
+                            }}
+                            style={{ width: '100%' }}
+                          >
+                            {operator === 'IS NULL' || operator === 'IS_NULL' ? 'Filter NULL' : 'Filter NOT NULL'}
+                          </Button>
+                        </Form.Item>
+                      </Col>
+                    );
+                  }
+                  
+                  // For BETWEEN, show two inputs (already handled for date type)
+                  if (isBetweenOperator && field.type !== 'date') {
+                    return (
+                      <Col key={field.name} xs={24} sm={12} md={12} lg={8}>
+                        <Form.Item 
+                          label={field.label} 
+                          style={{ marginBottom: 0 }}
+                        >
+                          <Space.Compact style={{ width: '100%' }}>
+                            <Input
+                              placeholder="From"
+                              onChange={(e) => handleFilterChange(`${field.name}_from`, e.target.value, false)}
+                              value={filters[`${field.name}_from`] || ''}
+                              style={{ width: '50%' }}
+                            />
+                            <Input
+                              placeholder="To"
+                              onChange={(e) => handleFilterChange(`${field.name}_to`, e.target.value, false)}
+                              value={filters[`${field.name}_to`] || ''}
+                              style={{ width: '50%' }}
+                            />
+                          </Space.Compact>
+                        </Form.Item>
+                      </Col>
+                    );
+                  }
+                  
+                  // For IN / NOT IN, show tags input
+                  if (isInOperator) {
+                    return (
+                      <Col key={field.name} xs={24} sm={12} md={8} lg={6}>
+                        <Form.Item 
+                          label={field.label} 
+                          style={{ marginBottom: 0 }}
+                          htmlFor={`filter-${field.name}`}
+                        >
+                          <Select
+                            id={`filter-${field.name}`}
+                            mode="tags"
+                            placeholder={`Enter values for ${field.label}`}
+                            allowClear
+                            style={{ width: '100%' }}
+                            onChange={(values) => {
+                              const filterValue = Array.isArray(values) && values.length > 0 
+                                ? values.join(',')
+                                : '';
+                              handleFilterChange(field.name, filterValue, false);
+                            }}
+                            value={
+                              filters[field.name] 
+                                ? (typeof filters[field.name] === 'string'
+                                    ? filters[field.name].split(',').filter(v => v.trim())
+                                    : Array.isArray(filters[field.name])
+                                      ? filters[field.name]
+                                      : [])
+                                : undefined
                             }
-                          }}
-                          aria-label={`Filter ${field.label} by date range`}
-                        />
-                      ) : field.type === 'tags' ? (
-                        <Select
-                          id={`filter-${field.name}`}
-                          mode="tags"
-                          placeholder={`Type and press Enter to add ${field.label} values`}
-                          allowClear
-                          style={{ width: '100%' }}
-                          onChange={(values) => {
-                            // Convert array to comma-separated string for backend
-                            const filterValue = Array.isArray(values) && values.length > 0 
-                              ? values.join(',')
-                              : '';
-                            handleFilterChange(field.name, filterValue, false);
-                          }}
-                          value={
-                            filters[field.name] 
-                              ? (typeof filters[field.name] === 'string'
-                                  ? filters[field.name].split(',').filter(v => v.trim())
-                                  : Array.isArray(filters[field.name])
-                                    ? filters[field.name]
-                                    : [])
-                              : undefined
-                          }
-                          tokenSeparators={[',']}
-                          aria-label={`Filter by ${field.label}`}
-                          notFoundContent={null}
-                          maxTagCount="responsive"
-                        />
-                      ) : (
-                        <Input
-                          id={`filter-${field.name}`}
-                          placeholder={`Filter by ${field.label}`}
-                          allowClear
-                          onChange={(e) => handleFilterChange(field.name, e.target.value, false)}
-                          aria-label={`Filter by ${field.label}`}
-                        />
-                      )}
-                    </Form.Item>
-                  </Col>
-                ))}
+                            tokenSeparators={[',']}
+                            aria-label={`Filter by ${field.label}`}
+                            notFoundContent={null}
+                            maxTagCount="responsive"
+                          />
+                        </Form.Item>
+                      </Col>
+                    );
+                  }
+                  
+                  // Default rendering based on field type
+                  return (
+                    <Col key={field.name} xs={24} sm={12} md={8} lg={6}>
+                      <Form.Item 
+                        label={field.label} 
+                        style={{ marginBottom: 0 }}
+                        htmlFor={`filter-${field.name}`}
+                      >
+                        {field.type === 'select' ? (
+                          <Select
+                            id={`filter-${field.name}`}
+                            placeholder={`Select ${field.label}`}
+                            allowClear
+                            style={{ width: '100%' }}
+                            onChange={(value) => handleFilterChange(field.name, value, true)}
+                            options={
+                              field.options
+                                ? field.options.map((opt) => ({ label: opt, value: opt }))
+                                : []
+                            }
+                            aria-label={`Filter by ${field.label}`}
+                          />
+                        ) : field.type === 'date' ? (
+                          <RangePicker
+                            id={`filter-${field.name}`}
+                            style={{ width: '100%' }}
+                            onChange={(dates) => {
+                              if (dates && dates[0] && dates[1]) {
+                                handleFilterChange(`${field.name}_from`, dates[0].format('YYYY-MM-DD'), true);
+                                handleFilterChange(`${field.name}_to`, dates[1].format('YYYY-MM-DD'), true);
+                              } else {
+                                handleFilterChange(`${field.name}_from`, null, true);
+                                handleFilterChange(`${field.name}_to`, null, true);
+                              }
+                            }}
+                            aria-label={`Filter ${field.label} by date range`}
+                          />
+                        ) : field.type === 'tags' ? (
+                          <Select
+                            id={`filter-${field.name}`}
+                            mode="tags"
+                            placeholder={`Type and press Enter to add ${field.label} values`}
+                            allowClear
+                            style={{ width: '100%' }}
+                            onChange={(values) => {
+                              const filterValue = Array.isArray(values) && values.length > 0 
+                                ? values.join(',')
+                                : '';
+                              handleFilterChange(field.name, filterValue, false);
+                            }}
+                            value={
+                              filters[field.name] 
+                                ? (typeof filters[field.name] === 'string'
+                                    ? filters[field.name].split(',').filter(v => v.trim())
+                                    : Array.isArray(filters[field.name])
+                                      ? filters[field.name]
+                                      : [])
+                                : undefined
+                            }
+                            tokenSeparators={[',']}
+                            aria-label={`Filter by ${field.label}`}
+                            notFoundContent={null}
+                            maxTagCount="responsive"
+                          />
+                        ) : field.type === 'number' ? (
+                          <InputNumber
+                            id={`filter-${field.name}`}
+                            placeholder={`Filter by ${field.label}`}
+                            style={{ width: '100%' }}
+                            onChange={(value) => handleFilterChange(field.name, value, false)}
+                            aria-label={`Filter by ${field.label}`}
+                          />
+                        ) : field.type === 'boolean' ? (
+                          <Select
+                            id={`filter-${field.name}`}
+                            placeholder={`Select ${field.label}`}
+                            allowClear
+                            style={{ width: '100%' }}
+                            onChange={(value) => handleFilterChange(field.name, value, true)}
+                            options={[
+                              { label: 'Yes (True)', value: 'true' },
+                              { label: 'No (False)', value: 'false' }
+                            ]}
+                            aria-label={`Filter by ${field.label}`}
+                          />
+                        ) : field.type === 'time' ? (
+                          <TimePicker
+                            id={`filter-${field.name}`}
+                            placeholder={`Select ${field.label}`}
+                            style={{ width: '100%' }}
+                            format="HH:mm:ss"
+                            onChange={(time) => {
+                              handleFilterChange(field.name, time ? time.format('HH:mm:ss') : null, true);
+                            }}
+                            aria-label={`Filter by ${field.label}`}
+                          />
+                        ) : field.type === 'datetime' ? (
+                          <DatePicker
+                            id={`filter-${field.name}`}
+                            showTime
+                            placeholder={`Select ${field.label}`}
+                            style={{ width: '100%' }}
+                            format="YYYY-MM-DD HH:mm:ss"
+                            onChange={(date) => {
+                              handleFilterChange(field.name, date ? date.format('YYYY-MM-DD HH:mm:ss') : null, true);
+                            }}
+                            aria-label={`Filter by ${field.label}`}
+                          />
+                        ) : field.type === 'email' ? (
+                          <Input
+                            id={`filter-${field.name}`}
+                            type="email"
+                            placeholder={`Enter ${field.label} email`}
+                            allowClear
+                            onChange={(e) => handleFilterChange(field.name, e.target.value, false)}
+                            aria-label={`Filter by ${field.label}`}
+                          />
+                        ) : field.type === 'url' ? (
+                          <Input
+                            id={`filter-${field.name}`}
+                            type="url"
+                            placeholder={`Enter ${field.label} URL`}
+                            allowClear
+                            onChange={(e) => handleFilterChange(field.name, e.target.value, false)}
+                            aria-label={`Filter by ${field.label}`}
+                          />
+                        ) : field.type === 'textarea' ? (
+                          <Input.TextArea
+                            id={`filter-${field.name}`}
+                            placeholder={`Filter by ${field.label}`}
+                            rows={2}
+                            allowClear
+                            onChange={(e) => handleFilterChange(field.name, e.target.value, false)}
+                            aria-label={`Filter by ${field.label}`}
+                          />
+                        ) : field.type === 'radio' ? (
+                          <Select
+                            id={`filter-${field.name}`}
+                            placeholder={`Select ${field.label}`}
+                            allowClear
+                            style={{ width: '100%' }}
+                            onChange={(value) => handleFilterChange(field.name, value, true)}
+                            options={
+                              field.options
+                                ? field.options.map((opt) => ({ label: opt, value: opt }))
+                                : []
+                            }
+                            aria-label={`Filter by ${field.label}`}
+                          />
+                        ) : (
+                          <Input
+                            id={`filter-${field.name}`}
+                            placeholder={`Filter by ${field.label}`}
+                            allowClear
+                            onChange={(e) => handleFilterChange(field.name, e.target.value, false)}
+                            aria-label={`Filter by ${field.label}`}
+                          />
+                        )}
+                      </Form.Item>
+                    </Col>
+                  );
+                })}
                 <Col xs={24} sm={12} md={8} lg={6}>
                   <Form.Item style={{ marginBottom: 0 }}>
                     <Button 
@@ -888,19 +1105,89 @@ function DataPage() {
         )}
 
         {/* Data Table Component */}
-        <DataTable
-          config={tableConfig}
-          data={tableData}
-          total={effectiveTotal}
-          loading={isFetching && !!config}
-          pagination={pagination}
-          sorting={sorting}
-          onTableChange={handleTableChange}
-          onMoreClick={handleMoreClick}
-          token={token}
-          hasMore={hasMore}
-          hasHiddenColumns={hiddenColumns.length > 0}
-        />
+        {isError && error && tableData && tableData.length > 0 ? (
+          <div>
+            <Alert
+              message={error?.message || error?.response?.data?.message || 'An error occurred while loading data'}
+              description={
+                error?.response?.data?.details && (
+                  <Text type="secondary" style={{ fontSize: '12px' }}>
+                    {Array.isArray(error.response.data.details) 
+                      ? error.response.data.details.join('; ')
+                      : error.response.data.details}
+                  </Text>
+                )
+              }
+              type="error"
+              showIcon
+              closable
+              style={{ marginBottom: token.marginMD }}
+              action={
+                <Button 
+                  size="small" 
+                  icon={<ReloadOutlined />} 
+                  onClick={handleRetryWithReset}
+                >
+                  Retry
+                </Button>
+              }
+            />
+            <DataTable
+              config={tableConfig}
+              data={tableData}
+              total={effectiveTotal}
+              loading={false}
+              pagination={pagination}
+              sorting={sorting}
+              onTableChange={handleTableChange}
+              onMoreClick={handleMoreClick}
+              token={token}
+              hasMore={hasMore}
+              hasHiddenColumns={hiddenColumns.length > 0}
+            />
+          </div>
+        ) : isError && error ? (
+          <Card>
+            <Alert
+              message={error?.message || error?.response?.data?.message || 'An error occurred while loading data'}
+              description={
+                <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                  {error?.response?.data?.details && (
+                    <Text type="secondary" style={{ fontSize: '12px' }}>
+                      {Array.isArray(error.response.data.details) 
+                        ? error.response.data.details.join('; ')
+                        : error.response.data.details}
+                    </Text>
+                  )}
+                  <Button 
+                    size="small" 
+                    icon={<ReloadOutlined />} 
+                    onClick={handleRetryWithReset}
+                    style={{ marginTop: token.marginXS }}
+                  >
+                    Retry
+                  </Button>
+                </Space>
+              }
+              type="error"
+              showIcon
+            />
+          </Card>
+        ) : (
+          <DataTable
+            config={tableConfig}
+            data={tableData}
+            total={effectiveTotal}
+            loading={isFetching && !!config}
+            pagination={pagination}
+            sorting={sorting}
+            onTableChange={handleTableChange}
+            onMoreClick={handleMoreClick}
+            token={token}
+            hasMore={hasMore}
+            hasHiddenColumns={hiddenColumns.length > 0}
+          />
+        )}
       </Card>
 
       <Modal
