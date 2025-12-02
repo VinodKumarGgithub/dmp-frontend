@@ -589,8 +589,8 @@ function DataPage() {
         />
         <ErrorDisplay error={error} config={config} />
         <Button icon={<ReloadOutlined />} onClick={handleRetryWithReset} style={{ marginTop: token.marginMD }}>
-          Retry
-        </Button>
+            Retry
+          </Button>
       </div>
     );
   }
@@ -929,68 +929,68 @@ function DataPage() {
                   
                   // Default rendering based on field type
                   return (
-                    <Col key={field.name} xs={24} sm={12} md={8} lg={6}>
-                      <Form.Item 
-                        label={field.label} 
-                        style={{ marginBottom: 0 }}
-                        htmlFor={`filter-${field.name}`}
-                      >
-                        {field.type === 'select' ? (
-                          <Select
-                            id={`filter-${field.name}`}
-                            placeholder={`Select ${field.label}`}
-                            allowClear
-                            style={{ width: '100%' }}
-                            onChange={(value) => handleFilterChange(field.name, value, true)}
-                            options={
-                              field.options
-                                ? field.options.map((opt) => ({ label: opt, value: opt }))
-                                : []
+                  <Col key={field.name} xs={24} sm={12} md={8} lg={6}>
+                    <Form.Item 
+                      label={field.label} 
+                      style={{ marginBottom: 0 }}
+                      htmlFor={`filter-${field.name}`}
+                    >
+                      {field.type === 'select' ? (
+                        <Select
+                          id={`filter-${field.name}`}
+                          placeholder={`Select ${field.label}`}
+                          allowClear
+                          style={{ width: '100%' }}
+                          onChange={(value) => handleFilterChange(field.name, value, true)}
+                          options={
+                            field.options
+                              ? field.options.map((opt) => ({ label: opt, value: opt }))
+                              : []
+                          }
+                          aria-label={`Filter by ${field.label}`}
+                        />
+                      ) : field.type === 'date' ? (
+                        <RangePicker
+                          id={`filter-${field.name}`}
+                          style={{ width: '100%' }}
+                          onChange={(dates) => {
+                            if (dates && dates[0] && dates[1]) {
+                              handleFilterChange(`${field.name}_from`, dates[0].format('YYYY-MM-DD'), true);
+                              handleFilterChange(`${field.name}_to`, dates[1].format('YYYY-MM-DD'), true);
+                            } else {
+                              handleFilterChange(`${field.name}_from`, null, true);
+                              handleFilterChange(`${field.name}_to`, null, true);
                             }
-                            aria-label={`Filter by ${field.label}`}
-                          />
-                        ) : field.type === 'date' ? (
-                          <RangePicker
-                            id={`filter-${field.name}`}
-                            style={{ width: '100%' }}
-                            onChange={(dates) => {
-                              if (dates && dates[0] && dates[1]) {
-                                handleFilterChange(`${field.name}_from`, dates[0].format('YYYY-MM-DD'), true);
-                                handleFilterChange(`${field.name}_to`, dates[1].format('YYYY-MM-DD'), true);
-                              } else {
-                                handleFilterChange(`${field.name}_from`, null, true);
-                                handleFilterChange(`${field.name}_to`, null, true);
-                              }
-                            }}
-                            aria-label={`Filter ${field.label} by date range`}
-                          />
-                        ) : field.type === 'tags' ? (
-                          <Select
-                            id={`filter-${field.name}`}
-                            mode="tags"
-                            placeholder={`Type and press Enter to add ${field.label} values`}
-                            allowClear
-                            style={{ width: '100%' }}
-                            onChange={(values) => {
-                              const filterValue = Array.isArray(values) && values.length > 0 
-                                ? values.join(',')
-                                : '';
-                              handleFilterChange(field.name, filterValue, false);
-                            }}
-                            value={
-                              filters[field.name] 
-                                ? (typeof filters[field.name] === 'string'
-                                    ? filters[field.name].split(',').filter(v => v.trim())
-                                    : Array.isArray(filters[field.name])
-                                      ? filters[field.name]
-                                      : [])
-                                : undefined
-                            }
-                            tokenSeparators={[',']}
-                            aria-label={`Filter by ${field.label}`}
-                            notFoundContent={null}
-                            maxTagCount="responsive"
-                          />
+                          }}
+                          aria-label={`Filter ${field.label} by date range`}
+                        />
+                      ) : field.type === 'tags' ? (
+                        <Select
+                          id={`filter-${field.name}`}
+                          mode="tags"
+                          placeholder={`Type and press Enter to add ${field.label} values`}
+                          allowClear
+                          style={{ width: '100%' }}
+                          onChange={(values) => {
+                            const filterValue = Array.isArray(values) && values.length > 0 
+                              ? values.join(',')
+                              : '';
+                            handleFilterChange(field.name, filterValue, false);
+                          }}
+                          value={
+                            filters[field.name] 
+                              ? (typeof filters[field.name] === 'string'
+                                  ? filters[field.name].split(',').filter(v => v.trim())
+                                  : Array.isArray(filters[field.name])
+                                    ? filters[field.name]
+                                    : [])
+                              : undefined
+                          }
+                          tokenSeparators={[',']}
+                          aria-label={`Filter by ${field.label}`}
+                          notFoundContent={null}
+                          maxTagCount="responsive"
+                        />
                         ) : field.type === 'number' ? (
                           <InputNumber
                             id={`filter-${field.name}`}
@@ -1076,17 +1076,17 @@ function DataPage() {
                             }
                             aria-label={`Filter by ${field.label}`}
                           />
-                        ) : (
-                          <Input
-                            id={`filter-${field.name}`}
-                            placeholder={`Filter by ${field.label}`}
-                            allowClear
-                            onChange={(e) => handleFilterChange(field.name, e.target.value, false)}
-                            aria-label={`Filter by ${field.label}`}
-                          />
-                        )}
-                      </Form.Item>
-                    </Col>
+                      ) : (
+                        <Input
+                          id={`filter-${field.name}`}
+                          placeholder={`Filter by ${field.label}`}
+                          allowClear
+                          onChange={(e) => handleFilterChange(field.name, e.target.value, false)}
+                          aria-label={`Filter by ${field.label}`}
+                        />
+                      )}
+                    </Form.Item>
+                  </Col>
                   );
                 })}
                 <Col xs={24} sm={12} md={8} lg={6}>
@@ -1174,19 +1174,19 @@ function DataPage() {
             />
           </Card>
         ) : (
-          <DataTable
-            config={tableConfig}
-            data={tableData}
-            total={effectiveTotal}
-            loading={isFetching && !!config}
-            pagination={pagination}
-            sorting={sorting}
-            onTableChange={handleTableChange}
-            onMoreClick={handleMoreClick}
-            token={token}
-            hasMore={hasMore}
-            hasHiddenColumns={hiddenColumns.length > 0}
-          />
+        <DataTable
+          config={tableConfig}
+          data={tableData}
+          total={effectiveTotal}
+          loading={isFetching && !!config}
+          pagination={pagination}
+          sorting={sorting}
+          onTableChange={handleTableChange}
+          onMoreClick={handleMoreClick}
+          token={token}
+          hasMore={hasMore}
+          hasHiddenColumns={hiddenColumns.length > 0}
+        />
         )}
       </Card>
 

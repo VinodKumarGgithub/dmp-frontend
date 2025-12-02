@@ -6,6 +6,11 @@ import {
   EyeInvisibleOutlined,
   SecurityScanOutlined,
   CheckCircleOutlined,
+  InboxOutlined,
+  SearchOutlined,
+  SendOutlined,
+  StopOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons';
 import { useTheme as useCustomTheme } from '../../contexts/ThemeContext';
 import { hexToRgba } from '../../utils/colorUtils';
@@ -70,15 +75,13 @@ export default function SecuritySection() {
         padding: isMobile ? token.paddingLG : token.paddingXL * 1.5,
         paddingTop: isMobile ? token.paddingXL * 1 : token.paddingXL * 2,
         paddingBottom: isMobile ? token.paddingXL * 1 : token.paddingXL * 2,
-        maxWidth: 1200,
+        maxWidth: token.screenLG,
         margin: '0 auto',
-        background: isDark
-          ? 'linear-gradient(135deg, rgba(10, 10, 10, 0.8) 0%, rgba(20, 20, 20, 0.9) 100%)'
-          : 'linear-gradient(135deg, rgba(248, 249, 250, 0.9) 0%, rgba(255, 255, 255, 1) 100%)',
-        borderRadius: 24,
+        background: 'transparent',
+        borderRadius: token.borderRadiusLG * 2,
         border: isDark
-          ? '1px solid rgba(255, 255, 255, 0.1)'
-          : '1px solid rgba(0, 0, 0, 0.08)',
+          ? `1px solid ${hexToRgba(token.colorText, 0.1)}`
+          : `1px solid ${hexToRgba(token.colorText, 0.08)}`,
       }}
     >
       <ScrollReveal direction="up" delay={0}>
@@ -99,19 +102,19 @@ export default function SecuritySection() {
             padding: token.paddingXL,
             textAlign: 'center',
             background: isDark
-              ? `linear-gradient(135deg, ${hexToRgba('#52c41a', 0.15)}, rgba(255, 255, 255, 0.03))`
-              : `linear-gradient(135deg, ${hexToRgba('#52c41a', 0.08)}, rgba(255, 255, 255, 1))`,
-            border: `2px solid ${hexToRgba('#52c41a', 0.3)}`,
+              ? `linear-gradient(135deg, ${hexToRgba(token.colorSuccess, 0.15)}, ${hexToRgba(token.colorText, 0.03)})`
+              : `linear-gradient(135deg, ${hexToRgba(token.colorSuccess, 0.08)}, ${hexToRgba(token.colorBgContainer, 0.5)})`,
+            border: `2px solid ${hexToRgba(token.colorSuccess, 0.3)}`,
           }}
         >
-          <Title level={3} style={{ marginBottom: token.marginMD, color: '#52c41a' }}>
+          <Title level={3} style={{ marginBottom: token.marginMD, color: token.colorSuccess }}>
             Zero Data Storage Policy
           </Title>
           <Text
             style={{
-              fontSize: '1.1rem',
+              fontSize: token.fontSizeLG,
               lineHeight: 1.8,
-              color: isDark ? 'rgba(255, 255, 255, 0.9)' : 'rgba(0, 0, 0, 0.85)',
+              color: isDark ? token.colorTextSecondary : token.colorText,
             }}
           >
             <strong>Your data never leaves your database.</strong> We execute queries against your database,
@@ -158,16 +161,16 @@ export default function SecuritySection() {
                   style={{
                     marginBottom: token.marginSM,
                     color: feature.color,
-                    fontSize: '1.1rem',
+                    fontSize: token.fontSizeLG,
                   }}
                 >
                   {feature.title}
                 </Title>
                 <Text
                   style={{
-                    fontSize: '0.9rem',
+                    fontSize: token.fontSize,
                     lineHeight: 1.6,
-                    color: isDark ? 'rgba(255, 255, 255, 0.7)' : 'rgba(0, 0, 0, 0.65)',
+                    color: isDark ? token.colorTextSecondary : token.colorTextTertiary,
                   }}
                 >
                   {feature.description}
@@ -185,8 +188,8 @@ export default function SecuritySection() {
             marginTop: token.marginXL * 2,
             padding: token.paddingXL,
             background: isDark
-              ? 'rgba(255, 255, 255, 0.03)'
-              : 'rgba(255, 255, 255, 1)',
+              ? hexToRgba(token.colorBgContainer, 0.03)
+              : hexToRgba(token.colorBgContainer, 0.5),
           }}
         >
           <Title level={4} style={{ marginBottom: token.marginLG, textAlign: 'center' }}>
@@ -202,11 +205,11 @@ export default function SecuritySection() {
             }}
           >
             {[
-              { step: '1', text: 'Query Received', icon: '📥' },
-              { step: '2', text: 'Executed (Read-Only)', icon: '🔍' },
-              { step: '3', text: 'Results Returned', icon: '📤' },
-              { step: '4', text: 'No Storage', icon: '❌' },
-              { step: '5', text: 'Metadata Logged', icon: '📝' },
+              { step: '1', text: 'Query Received', icon: <InboxOutlined /> },
+              { step: '2', text: 'Executed (Read-Only)', icon: <SearchOutlined /> },
+              { step: '3', text: 'Results Returned', icon: <SendOutlined /> },
+              { step: '4', text: 'No Storage', icon: <StopOutlined /> },
+              { step: '5', text: 'Metadata Logged', icon: <FileTextOutlined /> },
             ].map((item, idx) => (
               <div
                 key={idx}
@@ -215,16 +218,23 @@ export default function SecuritySection() {
                   textAlign: 'center',
                   padding: token.paddingMD,
                   background: isDark
-                    ? 'rgba(255, 255, 255, 0.05)'
-                    : 'rgba(0, 0, 0, 0.02)',
-                  borderRadius: 12,
+                    ? hexToRgba(token.colorBgContainer, 0.05)
+                    : hexToRgba(token.colorText, 0.02),
+                  borderRadius: token.borderRadius,
                 }}
               >
-                <div style={{ fontSize: '2rem', marginBottom: token.marginXS }}>{item.icon}</div>
+                <div style={{ marginBottom: token.marginXS }}>
+                  <GlassIcon 
+                    icon={item.icon} 
+                    size={32} 
+                    iconSize={16} 
+                    className="icon-minimal" 
+                  />
+                </div>
                 <Text strong style={{ display: 'block', marginBottom: token.marginXXS }}>
                   Step {item.step}
                 </Text>
-                <Text style={{ fontSize: '0.85rem' }}>{item.text}</Text>
+                <Text style={{ fontSize: token.fontSizeSM }}>{item.text}</Text>
               </div>
             ))}
           </div>

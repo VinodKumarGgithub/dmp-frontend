@@ -23,14 +23,19 @@ export default function LandingNavbar() {
   const branding = useOrganizationBranding();
   const [scrolled, setScrolled] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isTablet, setIsTablet] = useState(false);
+  const [screenWidth, setScreenWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
 
   useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
+    const checkScreenSize = () => {
+      const width = window.innerWidth;
+      setScreenWidth(width);
+      setIsMobile(width < 768);
+      setIsTablet(width >= 768 && width < 1024);
     };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    checkScreenSize();
+    window.addEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkScreenSize);
   }, []);
 
   useEffect(() => {
@@ -76,13 +81,22 @@ export default function LandingNavbar() {
     <nav
       style={{
         position: 'fixed',
-        top: 20,
+        top: isMobile ? 10 : 20,
         left: '50%',
         transform: 'translateX(-50%)',
-        width: 'calc(100% - 40px)',
+        width: isMobile 
+          ? 'calc(100% - 20px)' 
+          : isTablet 
+          ? 'calc(100% - 32px)' 
+          : 'calc(100% - 40px)',
         maxWidth: 1400,
+        minWidth: 280, // Prevent too small navbar
         zIndex: 1000,
-        padding: `${token.paddingSM}px ${token.paddingLG}px`,
+        padding: isMobile 
+          ? `${token.paddingXS}px ${token.paddingMD}px`
+          : isTablet 
+          ? `${token.paddingSM}px ${token.paddingMD}px`
+          : `${token.paddingSM}px ${token.paddingLG}px`,
         background: isDark
           ? 'rgba(30, 30, 30, 0.4)'
           : 'rgba(255, 255, 255, 0.5)',
@@ -107,8 +121,10 @@ export default function LandingNavbar() {
           flex: '0 0 auto', 
           display: 'flex', 
           alignItems: 'center', 
-          gap: token.marginSM,
+          gap: isMobile ? token.marginXS : token.marginSM,
           cursor: 'pointer',
+          minWidth: 0, // Allow shrinking
+          maxWidth: isMobile ? '40%' : isTablet ? '35%' : '30%',
         }}
         onClick={() => handleNavClick('hero')}
       >
@@ -117,26 +133,33 @@ export default function LandingNavbar() {
             src={branding.logoUrl}
             alt={branding.appName}
             style={{
-              height: 28,
+              height: isMobile ? 24 : 28,
+              width: 'auto',
               objectFit: 'contain',
+              flexShrink: 0,
             }}
           />
         )}
         <Text
           strong
+          ellipsis
           style={{
-            fontSize: '1rem',
+            fontSize: isMobile ? '0.85rem' : isTablet ? '0.9rem' : '1rem',
             fontWeight: 600,
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
             color: isDark ? 'rgba(255, 255, 255, 0.95)' : 'rgba(0, 0, 0, 0.9)',
             letterSpacing: '-0.01em',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            minWidth: 0, // Allow text truncation
           }}
         >
           {branding.appName || 'Platform'}
         </Text>
       </div>
 
-      {/* Navigation Menu - Center (Desktop) */}
+      {/* Navigation Menu - Center (Desktop/Tablet) */}
       {!isMobile && (
         <div
           style={{
@@ -144,22 +167,35 @@ export default function LandingNavbar() {
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
+            minWidth: 0, // Allow shrinking
+            overflow: 'hidden',
           }}
         >
-          <Space size="large" style={{ marginRight: token.marginXL }}>
+          <Space 
+            size={isTablet ? "middle" : "large"} 
+            style={{ 
+              marginRight: isTablet ? token.marginMD : token.marginXL,
+              flexWrap: 'nowrap',
+            }}
+          >
             {sections.map((section) => (
               <Text
                 key={section.key}
                 onClick={() => handleNavClick(section.key)}
+                ellipsis
                 style={{
-                  fontSize: '0.85rem',
+                  fontSize: isTablet ? '0.75rem' : '0.85rem',
                   fontWeight: 500,
                   fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                   color: isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.7)',
                   cursor: 'pointer',
                   transition: 'color 0.2s ease',
-                  padding: `${token.paddingXS}px ${token.paddingSM}px`,
+                  padding: `${token.paddingXS}px ${isTablet ? token.paddingXS : token.paddingSM}px`,
                   borderRadius: 8,
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  maxWidth: isTablet ? '80px' : '120px',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.color = isDark ? 'rgba(255, 255, 255, 1)' : 'rgba(0, 0, 0, 0.9)';
@@ -175,14 +211,16 @@ export default function LandingNavbar() {
         </div>
       )}
 
-      {/* Slogan - Center (Mobile) or Right (Desktop) */}
+      {/* Slogan - Right (All screen sizes) */}
       <div
         style={{
-          flex: isMobile ? '1 1 auto' : '0 0 auto',
+          flex: '0 0 auto',
           display: 'flex',
-          justifyContent: isMobile ? 'center' : 'flex-end',
+          justifyContent: 'flex-end',
           alignItems: 'center',
-          gap: token.marginSM,
+          gap: isMobile ? token.marginXS : token.marginSM,
+          minWidth: 0, // Allow shrinking
+          flexShrink: 0,
         }}
       >
         {isMobile ? (
@@ -191,8 +229,8 @@ export default function LandingNavbar() {
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: 6,
-                padding: `${token.paddingXS}px ${token.paddingSM}px`,
+                gap: screenWidth < 480 ? 4 : 5,
+                padding: `${token.paddingXS}px ${screenWidth < 480 ? token.paddingXS : token.paddingSM}px`,
                 background: isDark
                   ? `linear-gradient(135deg, ${hexToRgba(sloganColor, 0.15)}, ${hexToRgba(sloganColor, 0.08)})`
                   : `linear-gradient(135deg, ${hexToRgba(sloganColor, 0.12)}, ${hexToRgba(sloganColor, 0.06)})`,
@@ -201,34 +239,66 @@ export default function LandingNavbar() {
                 backdropFilter: 'blur(10px)',
                 WebkitBackdropFilter: 'blur(10px)',
                 transition: 'all 0.3s ease',
+                marginRight: token.marginXS,
+                flexShrink: 1,
+                minWidth: 0,
               }}
             >
               <div
                 style={{
-                  width: 4,
-                  height: 4,
+                  width: screenWidth < 480 ? 3 : 4,
+                  height: screenWidth < 480 ? 3 : 4,
                   borderRadius: '50%',
                   background: sloganGradient,
                   boxShadow: `0 0 8px ${hexToRgba(sloganColor, 0.6)}`,
                   flexShrink: 0,
                 }}
               />
-              <Text
+              <div
                 style={{
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-                  background: sloganGradient,
-                  WebkitBackgroundClip: 'text',
-                  WebkitTextFillColor: 'transparent',
-                  backgroundClip: 'text',
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: screenWidth < 480 ? 3 : 4,
+                  flexWrap: 'nowrap',
                 }}
               >
-                No Code
-              </Text>
+                {['No Code', 'No Limits', 'No Waiting'].map((phrase, idx) => (
+                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: screenWidth < 480 ? 3 : 4 }}>
+                    <Text
+                      ellipsis
+                      style={{
+                        fontSize: screenWidth < 480 ? '0.6rem' : '0.65rem',
+                        fontWeight: 600,
+                        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+                        background: sloganGradient,
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        backgroundClip: 'text',
+                        letterSpacing: '0.3px',
+                        textTransform: 'uppercase',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        maxWidth: screenWidth < 480 ? '50px' : '60px',
+                      }}
+                    >
+                      {phrase}
+                    </Text>
+                    {idx < 2 && (
+                      <div
+                        style={{
+                          width: screenWidth < 480 ? 2 : 2.5,
+                          height: screenWidth < 480 ? 2 : 2.5,
+                          borderRadius: '50%',
+                          background: hexToRgba(sloganColor, 0.4),
+                          margin: `0 ${screenWidth < 480 ? 1 : 1}px`,
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
             <Dropdown overlay={menu} trigger={['click']} placement="bottomRight">
               <MenuOutlined
@@ -236,6 +306,7 @@ export default function LandingNavbar() {
                   fontSize: '1.2rem',
                   color: isDark ? 'rgba(255, 255, 255, 0.8)' : 'rgba(0, 0, 0, 0.7)',
                   cursor: 'pointer',
+                  flexShrink: 0,
                 }}
               />
             </Dropdown>
@@ -245,8 +316,8 @@ export default function LandingNavbar() {
             style={{
               display: 'inline-flex',
               alignItems: 'center',
-              gap: 8,
-              padding: `${token.paddingXS}px ${token.paddingMD}px`,
+              gap: isTablet ? 6 : 8,
+              padding: `${token.paddingXS}px ${isTablet ? token.paddingSM : token.paddingMD}px`,
               background: isDark
                 ? `linear-gradient(135deg, ${hexToRgba(sloganColor, 0.15)}, ${hexToRgba(sloganColor, 0.08)})`
                 : `linear-gradient(135deg, ${hexToRgba(sloganColor, 0.12)}, ${hexToRgba(sloganColor, 0.06)})`,
@@ -254,11 +325,13 @@ export default function LandingNavbar() {
               borderRadius: 24,
               backdropFilter: 'blur(10px)',
               WebkitBackdropFilter: 'blur(10px)',
-              marginRight: token.marginMD,
+              marginRight: isTablet ? token.marginSM : token.marginMD,
               boxShadow: isDark
                 ? `0 2px 8px ${hexToRgba(sloganColor, 0.15)}, inset 0 1px 0 ${hexToRgba(sloganColor, 0.1)}`
                 : `0 2px 8px ${hexToRgba(sloganColor, 0.1)}, inset 0 1px 0 rgba(255, 255, 255, 0.8)`,
               transition: 'all 0.3s ease',
+              flexShrink: 1, // Allow shrinking on smaller screens
+              minWidth: 0, // Allow shrinking
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.transform = 'translateY(-1px)';
@@ -289,14 +362,16 @@ export default function LandingNavbar() {
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: 6,
+                gap: isTablet ? 4 : 6,
+                flexWrap: 'nowrap',
               }}
             >
               {['No Code', 'No Limits', 'No Waiting'].map((phrase, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: isTablet ? 4 : 6 }}>
                   <Text
+                    ellipsis
                     style={{
-                      fontSize: '0.75rem',
+                      fontSize: isTablet ? '0.7rem' : '0.75rem',
                       fontWeight: 600,
                       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                       background: sloganGradient,
@@ -306,6 +381,9 @@ export default function LandingNavbar() {
                       letterSpacing: '0.4px',
                       textTransform: 'uppercase',
                       whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      maxWidth: isTablet ? '70px' : '90px',
                     }}
                   >
                     {phrase}
@@ -313,11 +391,12 @@ export default function LandingNavbar() {
                   {idx < 2 && (
                     <div
                       style={{
-                        width: 3,
-                        height: 3,
+                        width: isTablet ? 2 : 3,
+                        height: isTablet ? 2 : 3,
                         borderRadius: '50%',
                         background: hexToRgba(sloganColor, 0.4),
-                        margin: '0 2px',
+                        margin: `0 ${isTablet ? 1 : 2}px`,
+                        flexShrink: 0,
                       }}
                     />
                   )}

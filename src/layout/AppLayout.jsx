@@ -1,7 +1,19 @@
 import { memo, useMemo } from 'react';
 import { ProLayout } from '@ant-design/pro-layout';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { UserOutlined, LogoutOutlined, HomeOutlined, SettingOutlined, MailOutlined, PhoneOutlined, BarChartOutlined } from '@ant-design/icons';
+import { 
+  UserOutlined, 
+  LogoutOutlined, 
+  HomeOutlined, 
+  SettingOutlined, 
+  MailOutlined, 
+  PhoneOutlined, 
+  BarChartOutlined,
+  DatabaseOutlined,
+  TeamOutlined,
+  SafetyCertificateOutlined,
+  FileTextOutlined
+} from '@ant-design/icons';
 import { Dropdown, Space, Button, theme, Typography } from 'antd';
 import useAuthStore from '../stores/authStore';
 import { useQueryClient } from '@tanstack/react-query';
@@ -59,20 +71,40 @@ function AppLayout({ children }) {
         }
         return true;
       })
-      .map((route) => ({
+      .map((route) => {
+        // Map each route to its appropriate icon
+        let icon;
+        switch (route.key) {
+          case 'page-config':
+            icon = <SettingOutlined />;
+            break;
+          case 'users':
+            icon = <UserOutlined />;
+            break;
+          case 'tenants':
+            icon = <DatabaseOutlined />;
+            break;
+          case 'organizations':
+            icon = <TeamOutlined />;
+            break;
+          case 'licenses':
+            icon = <SafetyCertificateOutlined />;
+            break;
+          case 'audit-logs':
+            icon = <FileTextOutlined />;
+            break;
+          case 'analytics':
+            icon = <BarChartOutlined />;
+            break;
+          default:
+            icon = <HomeOutlined />;
+        }
+        return {
         path: route.path,
         name: route.label,
-        icon:
-          route.key === 'page-config' ? (
-            <SettingOutlined />
-          ) : route.key === 'users' ? (
-            <UserOutlined />
-          ) : route.key === 'analytics' ? (
-            <BarChartOutlined />
-          ) : (
-            <HomeOutlined />
-          ),
-      })),
+          icon,
+        };
+      }),
   ], [user?.role]);
 
   const { Text } = Typography;
